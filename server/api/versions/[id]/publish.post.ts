@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
       platform?: string
       arch?: string
     }>
-  }>(event)
+  }>(event) || {}
   const targets = body.targets?.map((target) => {
     if (!target.platform || !target.arch) {
       throw createError({

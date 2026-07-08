@@ -30,6 +30,11 @@ const creatingVersion = ref(false)
 const versionModalOpen = ref(false)
 const errorMessage = ref('')
 const versionError = ref('')
+const endpointForm = reactive({
+  channel: 'latest',
+  platform: 'win32',
+  arch: 'x64'
+})
 
 const { data: app, refresh } = await useFetch<AppDetail>(() => `/api/apps/${appId.value}`)
 const { data: versionsData, refresh: refreshVersions } = await useFetch<{ items: AppVersion[], total: number }>(
@@ -54,6 +59,72 @@ const versionForm = reactive({
 })
 
 const versions = computed(() => versionsData.value?.items || [])
+const channelItems = computed(() => {
+  const channels = new Set<string>()
+
+  if (app.value?.defaultChannel) {
+    channels.add(app.value.defaultChannel)
+  }
+
+  for (const version of versions.value) {
+    channels.add(version.channel)
+  }
+
+  channels.add(endpointForm.channel)
+
+  return Array.from(channels).filter(Boolean)
+})
+const platformItems = ['win32', 'darwin', 'linux']
+const archItems = ['x64', 'arm64']
+const origin = computed(() => {
+  if (import.meta.client) {
+    return window.location.origin
+  }
+
+  return ''
+})
+const updaterMetadataFile = computed(() => {
+  if (endpointForm.platform === 'darwin') {
+    return 'latest-mac.yml'
+  }
+
+  if (endpointForm.platform === 'linux') {
+    return 'latest-linux.yml'
+  }
+
+  return 'latest.yml'
+})
+const checkUpdateUrl = computed(() => {
+  if (!app.value?.slug || !origin.value) {
+    return ''
+  }
+
+  const url = new URL(`/api/public/apps/${encodeURIComponent(app.value.slug)}/check-update`, origin.value)
+
+  url.searchParams.set('channel', endpointForm.channel)
+  url.searchParams.set('platform', endpointForm.platform)
+  url.searchParams.set('arch', endpointForm.arch)
+
+  return url.toString()
+})
+const metadataUrl = computed(() => {
+  if (!app.value?.slug || !origin.value) {
+    return ''
+  }
+
+  const path = [
+    '/updates',
+    encodeURIComponent(app.value.slug),
+    encodeURIComponent(endpointForm.platform),
+    encodeURIComponent(endpointForm.channel),
+    updaterMetadataFile.value
+  ].join('/')
+  const url = new URL(path, origin.value)
+
+  url.searchParams.set('arch', endpointForm.arch)
+
+  return url.toString()
+})
 
 watch(app, (value) => {
   if (!value) {
@@ -67,6 +138,7 @@ watch(app, (value) => {
   form.enabled = value.enabled
   form.description = value.description || ''
   versionForm.channel = value.defaultChannel
+  endpointForm.channel = value.defaultChannel
 }, { immediate: true })
 
 function resetVersionForm() {
@@ -150,6 +222,19 @@ async function createVersion() {
   } finally {
     creatingVersion.value = false
   }
+}
+
+async function copyText(value: string, label: string) {
+  if (!value) {
+    return
+  }
+
+  await navigator.clipboard.writeText(value)
+  toast.add({
+    title: `${label}已复制`,
+    color: 'success',
+    icon: 'i-lucide-copy-check'
+  })
 }
 </script>
 
@@ -343,26 +428,68 @@ async function createVersion() {
       <aside class="space-y-4">
         <UCard>
           <template #header>
-            <h2 class="text-base font-semibold">
-              更新接口
-            </h2>
+            <div>
+              <h2 class="text-base font-semibold">
+                更新接口
+              </h2>
+              <p class="mt-1 text-sm text-muted">
+                选择目标后复制完整 URL，可直接在浏览器或客户端中测试。
+              </p>
+            </div>
           </template>
 
-          <div class="space-y-3 text-sm">
+          <div class="space-y-4 text-sm">
+            <div class="grid gap-3">
+              <UFormField label="Channel" name="endpointChannel">
+                <USelect v-model="endpointForm.channel" class="w-full" :items="channelItems" />
+              </UFormField>
+
+              <div class="grid grid-cols-2 gap-3">
+                <UFormField label="Platform" name="endpointPlatform">
+                  <USelect v-model="endpointForm.platform" class="w-full" :items="platformItems" />
+                </UFormField>
+
+                <UFormField label="Arch" name="endpointArch">
+                  <USelect v-model="endpointForm.arch" class="w-full" :items="archItems" />
+                </UFormField>
+              </div>
+            </div>
+
             <div>
-              <p class="text-muted">
-                自定义检查
-              </p>
-              <code class="mt-1 block break-all rounded bg-elevated px-2 py-1 text-xs">
-                /api/public/apps/{{ app?.slug }}/check-update
+              <div class="mb-1 flex items-center justify-between gap-2">
+                <p class="text-muted">
+                  自定义检查
+                </p>
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-copy"
+                  aria-label="复制自定义检查 URL"
+                  :disabled="!checkUpdateUrl"
+                  @click="copyText(checkUpdateUrl, '自定义检查 URL')"
+                />
+              </div>
+              <code class="block break-all rounded bg-elevated px-2 py-1 text-xs">
+                {{ checkUpdateUrl || '-' }}
               </code>
             </div>
+
             <div>
-              <p class="text-muted">
-                latest.yml
-              </p>
-              <code class="mt-1 block break-all rounded bg-elevated px-2 py-1 text-xs">
-                /updates/{{ app?.slug }}/win32/{{ app?.defaultChannel }}/latest.yml
+              <div class="mb-1 flex items-center justify-between gap-2">
+                <p class="text-muted">
+                  electron-updater
+                </p>
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-copy"
+                  aria-label="复制 electron-updater URL"
+                  :disabled="!metadataUrl"
+                  @click="copyText(metadataUrl, 'electron-updater URL')"
+                />
+              </div>
+              <code class="block break-all rounded bg-elevated px-2 py-1 text-xs">
+                {{ metadataUrl || '-' }}
               </code>
             </div>
           </div>
