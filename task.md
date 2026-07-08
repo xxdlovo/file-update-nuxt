@@ -47,61 +47,61 @@
 
 ## 3. 认证与后台保护
 
-- [ ] 实现管理员初始化能力。
-- [ ] 实现登录 API。
-- [ ] 实现退出 API。
-- [ ] 实现 session 获取 API。
-- [ ] 使用 `nuxt-auth-utils` 管理服务端 session。
-- [ ] 实现后台路由鉴权中间件。
-- [ ] 实现登录页。
-- [ ] 实现默认后台布局。
+- [x] 实现管理员初始化能力。
+- [x] 实现登录 API。
+- [x] 实现退出 API。
+- [x] 实现 session 获取 API。
+- [x] 使用 `nuxt-auth-utils` 管理服务端 session。
+- [x] 实现后台路由鉴权中间件。
+- [x] 实现登录页。
+- [x] 实现默认后台布局。
 
 ## 4. 应用管理
 
-- [ ] 实现应用列表 API。
-- [ ] 实现创建应用 API。
-- [ ] 实现应用详情 API。
-- [ ] 实现编辑应用 API。
-- [ ] 实现删除或停用应用 API。
-- [ ] 实现应用列表页。
-- [ ] 实现应用详情页。
-- [ ] 支持应用名称、slug、bundleId、默认通道、启用状态、描述。
+- [x] 实现应用列表 API。
+- [x] 实现创建应用 API。
+- [x] 实现应用详情 API。
+- [x] 实现编辑应用 API。
+- [x] 实现删除或停用应用 API。
+- [x] 实现应用列表页。
+- [x] 实现应用详情页。
+- [x] 支持应用名称、slug、bundleId、默认通道、启用状态、描述。
 
 ## 5. Electron 版本管理
 
-- [ ] 实现应用版本列表 API。
-- [ ] 实现创建版本 API。
-- [ ] 实现版本详情 API。
-- [ ] 实现编辑版本 API。
-- [ ] 实现版本撤回 API。
-- [ ] 实现版本详情页。
-- [ ] 支持版本号、构建号、通道、发布状态、强制更新、更新说明。
-- [ ] 实现基础 semver 版本比较。
+- [x] 实现应用版本列表 API。
+- [x] 实现创建版本 API。
+- [x] 实现版本详情 API。
+- [x] 实现编辑版本 API。
+- [x] 实现版本撤回 API。
+- [x] 实现版本详情页。
+- [x] 支持版本号、构建号、通道、发布状态、强制更新、更新说明。
+- [x] 实现基础 semver 版本比较。
 
 ## 6. Electron 升级文件上传
 
-- [ ] 封装 OSS 服务。
-- [ ] 实现 Electron 升级文件上传 token API。
-- [ ] 实现 Electron 升级文件上传完成确认 API。
-- [ ] 保存升级文件元数据。
-- [ ] 支持平台：`win32`、`darwin`、`linux`。
-- [ ] 支持架构：`x64`、`arm64`。
-- [ ] 支持包类型：`full`、`delta`、`blockmap`、`metadata`。
-- [ ] 保存文件大小、sha256、sha512、mimeType、objectKey。
-- [ ] 实现升级文件上传页面。
+- [x] 封装 OSS 服务。
+- [x] 实现 Electron 升级文件上传 token API。
+- [x] 实现 Electron 升级文件上传完成确认 API。
+- [x] 保存升级文件元数据。
+- [x] 支持平台：`win32`、`darwin`、`linux`。
+- [x] 支持架构：`x64`、`arm64`。
+- [x] 支持包类型：`full`、`delta`、`blockmap`、`metadata`。
+- [x] 保存文件大小、sha256、sha512、mimeType、objectKey。
+- [x] 实现升级文件上传页面。
 
 ## 7. Electron 发布与检查更新
 
-- [ ] 实现 Electron 版本发布 API。
-- [ ] 实现 Electron 版本撤回 API。
-- [ ] 实现 Electron 版本回滚 API。
-- [ ] 实现 `releases` 当前发布指针。
-- [ ] 实现自定义检查更新接口：`GET /api/public/apps/:appSlug/check-update`。
-- [ ] 实现 Electron 升级文件签名下载 URL。
-- [ ] 实现 `electron-updater` 兼容元数据接口。
-- [ ] 实现 `GET /updates/:appSlug/:platform/:channel/latest.yml`。
-- [ ] 实现 `GET /updates/:appSlug/:platform/:channel/latest-mac.yml`。
-- [ ] 实现 `GET /updates/:appSlug/:platform/:channel/latest-linux.yml`。
+- [x] 实现 Electron 版本发布 API。
+- [x] 实现 Electron 版本撤回 API。
+- [x] 实现 Electron 版本回滚 API。
+- [x] 实现 `releases` 当前发布指针。
+- [x] 实现自定义检查更新接口：`GET /api/public/apps/:appSlug/check-update`。
+- [x] 实现 Electron 升级文件签名下载 URL。
+- [x] 实现 `electron-updater` 兼容元数据接口。
+- [x] 实现 `GET /updates/:appSlug/:platform/:channel/latest.yml`。
+- [x] 实现 `GET /updates/:appSlug/:platform/:channel/latest-mac.yml`。
+- [x] 实现 `GET /updates/:appSlug/:platform/:channel/latest-linux.yml`。
 - [ ] 预留私有应用更新 token 校验。
 
 ## 8. 普通文件项目管理
@@ -160,6 +160,10 @@
 - [ ] 实现设置页。
 - [ ] 设置页显示 OSS 配置检查结果。
 - [ ] 设置页显示下载 URL 有效期配置。
+- [x] 新增存储配置菜单。
+- [x] 实现阿里云 OSS 存储配置新增页面。
+- [x] 实现阿里云 OSS 存储配置验证 API。
+- [x] 上传 Electron 升级文件时支持选择已验证的存储配置。
 
 ## 12. OSS 与下载安全
 
@@ -167,6 +171,7 @@
 - [ ] 实现短期签名下载 URL。
 - [ ] 支持下载 URL 过期时间配置。
 - [ ] 默认不依赖 OSS 公开读。
+- [x] 保存升级文件使用的存储配置并用于后续签名下载。
 - [ ] 普通文件只有显式公开时才允许公开访问。
 - [ ] 下载接口记录下载次数。
 - [ ] 保存文件 hash 供客户端校验。

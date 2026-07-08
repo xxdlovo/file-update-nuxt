@@ -59,6 +59,7 @@ export const updateFiles = sqliteTable('update_files', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   appId: integer('app_id').notNull().references(() => apps.id, { onDelete: 'cascade' }),
   versionId: integer('version_id').notNull().references(() => appVersions.id, { onDelete: 'cascade' }),
+  storageConfigId: integer('storage_config_id').references(() => storageConfigs.id, { onDelete: 'set null' }),
   platform: text('platform').notNull(),
   arch: text('arch').notNull(),
   packageType: text('package_type').notNull(),
@@ -76,6 +77,29 @@ export const updateFiles = sqliteTable('update_files', {
   index('update_files_version_idx').on(table.versionId),
   index('update_files_target_idx').on(table.appId, table.platform, table.arch, table.packageType),
   uniqueIndex('update_files_object_key_unique').on(table.objectKey)
+])
+
+export const storageConfigs = sqliteTable('storage_configs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  provider: text('provider').notNull().default('aliyun_oss'),
+  region: text('region').notNull(),
+  accessKeyId: text('access_key_id').notNull(),
+  accessKeySecret: text('access_key_secret').notNull(),
+  bucket: text('bucket').notNull(),
+  endpoint: text('endpoint'),
+  publicBaseUrl: text('public_base_url'),
+  uploadDir: text('upload_dir').notNull().default('electron-updates'),
+  fileReleaseDir: text('file_release_dir').notNull().default('files'),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  verified: integer('verified', { mode: 'boolean' }).notNull().default(false),
+  verifiedAt: text('verified_at'),
+  lastVerifyStatus: text('last_verify_status'),
+  lastVerifyMessage: text('last_verify_message'),
+  ...timestamps
+}, table => [
+  uniqueIndex('storage_configs_name_unique').on(table.name),
+  index('storage_configs_provider_verified_idx').on(table.provider, table.enabled, table.verified)
 ])
 
 export const releases = sqliteTable('releases', {
@@ -193,7 +217,15 @@ export const updateFilesRelations = relations(updateFiles, ({ one }) => ({
   version: one(appVersions, {
     fields: [updateFiles.versionId],
     references: [appVersions.id]
+  }),
+  storageConfig: one(storageConfigs, {
+    fields: [updateFiles.storageConfigId],
+    references: [storageConfigs.id]
   })
+}))
+
+export const storageConfigsRelations = relations(storageConfigs, ({ many }) => ({
+  updateFiles: many(updateFiles)
 }))
 
 export const releasesRelations = relations(releases, ({ one }) => ({
