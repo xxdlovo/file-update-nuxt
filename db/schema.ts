@@ -134,6 +134,7 @@ export const fileProjects = sqliteTable('file_projects', {
 export const fileVersions = sqliteTable('file_versions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   fileProjectId: integer('file_project_id').notNull().references(() => fileProjects.id, { onDelete: 'cascade' }),
+  storageConfigId: integer('storage_config_id').references(() => storageConfigs.id, { onDelete: 'set null' }),
   version: text('version').notNull(),
   versionNormalized: text('version_normalized').notNull(),
   channel: text('channel').notNull().default('stable'),
@@ -225,7 +226,8 @@ export const updateFilesRelations = relations(updateFiles, ({ one }) => ({
 }))
 
 export const storageConfigsRelations = relations(storageConfigs, ({ many }) => ({
-  updateFiles: many(updateFiles)
+  updateFiles: many(updateFiles),
+  fileVersions: many(fileVersions)
 }))
 
 export const releasesRelations = relations(releases, ({ one }) => ({
@@ -252,6 +254,10 @@ export const fileVersionsRelations = relations(fileVersions, ({ one, many }) => 
   creator: one(users, {
     fields: [fileVersions.createdBy],
     references: [users.id]
+  }),
+  storageConfig: one(storageConfigs, {
+    fields: [fileVersions.storageConfigId],
+    references: [storageConfigs.id]
   }),
   releases: many(fileReleases)
 }))

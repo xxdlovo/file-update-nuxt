@@ -1,3 +1,3 @@
 <script setup lang="ts">
-await navigateTo('/dashboard')
+navigateTo('/dashboard')
 </script>

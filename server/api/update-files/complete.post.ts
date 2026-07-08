@@ -52,6 +52,21 @@ export default defineEventHandler(async (event) => {
       mimeType: body.mimeType || null
     }).returning()
 
+    await writeAuditLog(event, {
+      action: 'update_file.upload',
+      resourceType: 'update_file',
+      resourceId: file.id,
+      metadata: {
+        appId: file.appId,
+        versionId: file.versionId,
+        fileName: file.fileName,
+        objectKey: file.objectKey,
+        platform: file.platform,
+        arch: file.arch,
+        packageType: file.packageType
+      }
+    })
+
     return file
   } catch {
     throw createError({

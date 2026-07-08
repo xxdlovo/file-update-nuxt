@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
 
   const id = parseIntegerParam(getRouterParam(event, 'id'))
   const config = await getStorageConfigRecord(id)
-  const result = await verifyAliyunOssConfig(config)
+  const result = await verifyStorageConfig(config)
   const now = new Date().toISOString()
   const db = useDb()
   const [updated] = await db.update(storageConfigs)

@@ -1,8 +1,10 @@
 <script setup lang="ts">
+type StorageProvider = 'aliyun_oss' | 'tencent_cos' | 'qiniu_kodo' | 'aws_s3' | 'upyun_uss'
+
 type StorageConfig = {
   id: number
   name: string
-  provider: string
+  provider: StorageProvider
   region: string
   accessKeyId: string
   bucket: string
@@ -17,6 +19,31 @@ type StorageConfig = {
   lastVerifyMessage: string | null
 }
 
+const providerItems = [{
+  label: '阿里云 OSS',
+  value: 'aliyun_oss'
+}, {
+  label: '腾讯云 COS',
+  value: 'tencent_cos'
+}, {
+  label: '七牛云 Kodo',
+  value: 'qiniu_kodo'
+}, {
+  label: 'AWS S3',
+  value: 'aws_s3'
+}, {
+  label: 'UPYUN USS',
+  value: 'upyun_uss'
+}]
+
+const providerLabels: Record<StorageProvider, string> = {
+  aliyun_oss: '阿里云 OSS',
+  tencent_cos: '腾讯云 COS',
+  qiniu_kodo: '七牛云 Kodo',
+  aws_s3: 'AWS S3',
+  upyun_uss: 'UPYUN USS'
+}
+
 const toast = useToast()
 const createOpen = ref(false)
 const verifyConfirmOpen = ref(false)
@@ -24,12 +51,14 @@ const creating = ref(false)
 const verifyingId = ref<number | null>(null)
 const errorMessage = ref('')
 const pendingVerifyConfig = ref<StorageConfig | null>(null)
+const editingConfig = ref<StorageConfig | null>(null)
 
-const { data, refresh } = await useFetch<{ items: StorageConfig[], total: number }>('/api/storage-configs')
+const { data, refresh } = useLazyFetch<{ items: StorageConfig[], total: number }>('/api/storage-configs')
 
 const configs = computed(() => data.value?.items || [])
 const form = reactive({
   name: '',
+  provider: 'aliyun_oss' as StorageProvider,
   region: '',
   accessKeyId: '',
   accessKeySecret: '',
@@ -40,9 +69,68 @@ const form = reactive({
   fileReleaseDir: 'files',
   enabled: true
 })
+const regionPlaceholder = computed(() => {
+  if (form.provider === 'aliyun_oss') {
+    return 'oss-cn-hangzhou'
+  }
+
+  if (form.provider === 'tencent_cos') {
+    return 'ap-guangzhou'
+  }
+
+  if (form.provider === 'qiniu_kodo') {
+    return 'z0'
+  }
+
+  if (form.provider === 'upyun_uss') {
+    return ''
+  }
+
+  return 'us-east-1'
+})
+const endpointPlaceholder = computed(() => {
+  if (form.provider === 'aliyun_oss') {
+    return 'oss-cn-hangzhou.aliyuncs.com'
+  }
+
+  if (form.provider === 'tencent_cos') {
+    return 'cos.ap-guangzhou.myqcloud.com'
+  }
+
+  if (form.provider === 'qiniu_kodo') {
+    return 'upload.qiniup.com'
+  }
+
+  if (form.provider === 'upyun_uss') {
+    return 's3.api.upyun.com'
+  }
+
+  return 's3.us-east-1.amazonaws.com'
+})
+const publicBaseUrlHint = computed(() => form.provider === 'qiniu_kodo'
+  ? '建议填写七牛融合 CDN 或下载域名'
+  : '可选')
+
+watch(() => form.provider, (provider) => {
+  if (provider !== 'upyun_uss') {
+    if (form.region === 'global') {
+      form.region = ''
+    }
+
+    if (form.endpoint === 's3.api.upyun.com') {
+      form.endpoint = ''
+    }
+
+    return
+  }
+
+  form.region = 'global'
+  form.endpoint = 's3.api.upyun.com'
+})
 
 function resetForm() {
   form.name = ''
+  form.provider = 'aliyun_oss'
   form.region = ''
   form.accessKeyId = ''
   form.accessKeySecret = ''
@@ -53,6 +141,53 @@ function resetForm() {
   form.fileReleaseDir = 'files'
   form.enabled = true
   errorMessage.value = ''
+}
+
+function openCreateModal() {
+  editingConfig.value = null
+  resetForm()
+  createOpen.value = true
+}
+
+function openEditModal(config: StorageConfig) {
+  editingConfig.value = config
+  form.name = config.name
+  form.provider = config.provider
+  form.region = config.provider === 'upyun_uss' ? 'global' : config.region
+  form.accessKeyId = config.accessKeyId
+  form.accessKeySecret = ''
+  form.bucket = config.bucket
+  form.endpoint = config.provider === 'upyun_uss' ? 's3.api.upyun.com' : config.endpoint || ''
+  form.publicBaseUrl = config.publicBaseUrl || ''
+  form.uploadDir = config.uploadDir
+  form.fileReleaseDir = config.fileReleaseDir
+  form.enabled = config.enabled
+  errorMessage.value = ''
+  createOpen.value = true
+}
+
+function providerLabel(provider: StorageProvider) {
+  return providerLabels[provider] || provider
+}
+
+function defaultEndpoint(config: StorageConfig) {
+  if (config.provider === 'aliyun_oss') {
+    return `${config.region}.aliyuncs.com`
+  }
+
+  if (config.provider === 'tencent_cos') {
+    return `cos.${config.region}.myqcloud.com`
+  }
+
+  if (config.provider === 'qiniu_kodo') {
+    return 'upload.qiniup.com'
+  }
+
+  if (config.provider === 'upyun_uss') {
+    return 's3.api.upyun.com'
+  }
+
+  return `s3.${config.region}.amazonaws.com`
 }
 
 function statusColor(config: StorageConfig) {
@@ -87,26 +222,27 @@ function formatTime(value: string | null) {
   return new Date(value).toLocaleString()
 }
 
-async function createConfig() {
+async function submitConfig() {
   errorMessage.value = ''
   creating.value = true
 
   try {
-    await $fetch('/api/storage-configs', {
-      method: 'POST',
+    await $fetch(editingConfig.value ? `/api/storage-configs/${editingConfig.value.id}` : '/api/storage-configs', {
+      method: editingConfig.value ? 'PATCH' : 'POST',
       body: form
     })
     toast.add({
-      title: '存储配置已创建',
+      title: editingConfig.value ? '存储配置已更新' : '存储配置已创建',
       color: 'success'
     })
     createOpen.value = false
+    editingConfig.value = null
     resetForm()
     await refresh()
   } catch (error) {
     errorMessage.value = error && typeof error === 'object' && 'statusMessage' in error
       ? String(error.statusMessage)
-      : '创建失败'
+      : editingConfig.value ? '更新失败' : '创建失败'
   } finally {
     creating.value = false
   }
@@ -154,14 +290,14 @@ async function verifyConfig() {
             存储配置
           </h1>
           <p class="mt-1 text-sm text-muted">
-            管理用于上传升级包的阿里云对象存储配置。
+            管理上传升级包和普通文件使用的对象存储配置。
           </p>
         </div>
 
         <UButton
           icon="i-lucide-plus"
           label="新增配置"
-          @click="createOpen = true"
+          @click="openCreateModal"
         />
       </div>
     </section>
@@ -171,10 +307,10 @@ async function verifyConfig() {
         <template #header>
           <div>
             <h2 class="text-base font-semibold">
-              阿里云 OSS
+              对象存储
             </h2>
             <p class="mt-1 text-sm text-muted">
-              只有验证成功且启用的配置会出现在上传文件的选择列表中。
+              已验证且启用的配置会出现在上传文件的选择列表中。
             </p>
           </div>
         </template>
@@ -184,6 +320,7 @@ async function verifyConfig() {
             <thead class="border-b border-muted text-muted">
               <tr>
                 <th class="px-4 py-3 font-medium">名称</th>
+                <th class="px-4 py-3 font-medium">Provider</th>
                 <th class="px-4 py-3 font-medium">Bucket</th>
                 <th class="px-4 py-3 font-medium">区域</th>
                 <th class="px-4 py-3 font-medium">状态</th>
@@ -193,7 +330,7 @@ async function verifyConfig() {
             </thead>
             <tbody>
               <tr v-if="configs.length === 0">
-                <td class="px-4 py-8 text-center text-muted" colspan="6">
+                <td class="px-4 py-8 text-center text-muted" colspan="7">
                   暂无存储配置
                 </td>
               </tr>
@@ -211,13 +348,16 @@ async function verifyConfig() {
                   </p>
                 </td>
                 <td class="px-4 py-3">
+                  <UBadge color="neutral" variant="subtle" :label="providerLabel(config.provider)" />
+                </td>
+                <td class="px-4 py-3">
                   <p>{{ config.bucket }}</p>
                   <p class="text-xs text-muted">
-                    {{ config.endpoint || `${config.region}.aliyuncs.com` }}
+                    {{ config.endpoint || defaultEndpoint(config) }}
                   </p>
                 </td>
                 <td class="px-4 py-3">
-                  {{ config.region }}
+                  {{ config.provider === 'upyun_uss' ? '-' : config.region }}
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex flex-wrap items-center gap-2">
@@ -240,7 +380,14 @@ async function verifyConfig() {
                   </p>
                 </td>
                 <td class="px-4 py-3">
-                  <div class="flex justify-end">
+                  <div class="flex justify-end gap-1">
+                    <UButton
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-pencil"
+                      aria-label="编辑配置"
+                      @click="openEditModal(config)"
+                    />
                     <UButton
                       color="neutral"
                       variant="ghost"
@@ -260,12 +407,12 @@ async function verifyConfig() {
 
     <UModal
       v-model:open="createOpen"
-      title="新增阿里云 OSS"
-      description="保存后请执行验证，验证成功的配置才能用于上传。"
+      :title="editingConfig ? '编辑对象存储' : '新增对象存储'"
+      :description="editingConfig ? '修改后需要重新验证，验证成功的配置才能用于上传。' : '保存后请执行验证，验证成功的配置才能用于上传。'"
       :ui="{ footer: 'justify-end' }"
     >
       <template #body>
-        <form id="create-storage-config-form" class="grid gap-4" @submit.prevent="createConfig">
+        <form id="create-storage-config-form" class="grid gap-4" @submit.prevent="submitConfig">
           <UAlert
             v-if="errorMessage"
             color="error"
@@ -274,21 +421,30 @@ async function verifyConfig() {
             :title="errorMessage"
           />
 
+          <UFormField label="Provider" name="provider" required>
+            <USelect v-model="form.provider" class="w-full" :items="providerItems" value-key="value" />
+          </UFormField>
+
           <div class="grid gap-4 sm:grid-cols-2">
             <UFormField label="名称" name="name" required>
-              <UInput v-model="form.name" class="w-full" placeholder="生产 OSS" />
+              <UInput v-model="form.name" class="w-full" placeholder="生产对象存储" />
             </UFormField>
 
-            <UFormField label="Region" name="region" required>
-              <UInput v-model="form.region" class="w-full" placeholder="oss-cn-hangzhou" />
+            <UFormField v-if="form.provider !== 'upyun_uss'" label="Region" name="region" required>
+              <UInput v-model="form.region" class="w-full" :placeholder="regionPlaceholder" />
             </UFormField>
 
-            <UFormField label="AccessKey ID" name="accessKeyId" required>
+            <UFormField label="Access Key ID" name="accessKeyId" required>
               <UInput v-model="form.accessKeyId" class="w-full" />
             </UFormField>
 
-            <UFormField label="AccessKey Secret" name="accessKeySecret" required>
-              <UInput v-model="form.accessKeySecret" class="w-full" type="password" />
+            <UFormField label="Access Key Secret" name="accessKeySecret" :required="!editingConfig">
+              <UInput
+                v-model="form.accessKeySecret"
+                class="w-full"
+                type="password"
+                :placeholder="editingConfig ? '留空则保持不变' : ''"
+              />
             </UFormField>
 
             <UFormField label="Bucket" name="bucket" required>
@@ -296,7 +452,12 @@ async function verifyConfig() {
             </UFormField>
 
             <UFormField label="Endpoint" name="endpoint" hint="可选">
-              <UInput v-model="form.endpoint" class="w-full" placeholder="oss-cn-hangzhou.aliyuncs.com" />
+              <UInput
+                v-model="form.endpoint"
+                class="w-full"
+                :disabled="form.provider === 'upyun_uss'"
+                :placeholder="endpointPlaceholder"
+              />
             </UFormField>
 
             <UFormField label="Electron 前缀" name="uploadDir" required>
@@ -308,7 +469,7 @@ async function verifyConfig() {
             </UFormField>
           </div>
 
-          <UFormField label="公开访问域名" name="publicBaseUrl" hint="可选">
+          <UFormField label="公开访问域名" name="publicBaseUrl" :hint="publicBaseUrlHint">
             <UInput v-model="form.publicBaseUrl" class="w-full" placeholder="https://cdn.example.com" />
           </UFormField>
 
@@ -346,7 +507,7 @@ async function verifyConfig() {
           variant="soft"
           icon="i-lucide-triangle-alert"
           title="验证会执行真实的上传和删除操作"
-          :description="`目标 Bucket：${pendingVerifyConfig?.bucket || '-'}`"
+          :description="`目标：${pendingVerifyConfig ? providerLabel(pendingVerifyConfig.provider) : '-'} / ${pendingVerifyConfig?.bucket || '-'}`"
         />
       </template>
 

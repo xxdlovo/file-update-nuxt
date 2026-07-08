@@ -21,6 +21,7 @@
     "nuxt-auth-utils": "^0.5.29"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.116",
     "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3"
   }

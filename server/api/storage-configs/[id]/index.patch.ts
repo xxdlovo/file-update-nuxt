@@ -7,9 +7,13 @@ export default defineEventHandler(async (event) => {
   const id = parseIntegerParam(getRouterParam(event, 'id'))
   const existing = await getStorageConfigRecord(id)
   const body = await readBody(event)
+  const accessKeyId = typeof body.accessKeyId === 'string' && body.accessKeyId.includes('*')
+    ? existing.accessKeyId
+    : body.accessKeyId
   const values = normalizeStorageConfigInput({
     ...existing,
     ...body,
+    accessKeyId,
     accessKeySecret: body.accessKeySecret?.trim() || existing.accessKeySecret
   })
   const db = useDb()

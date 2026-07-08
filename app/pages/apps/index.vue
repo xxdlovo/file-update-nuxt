@@ -15,6 +15,7 @@ const search = ref('')
 const includeDisabled = ref(false)
 const creating = ref(false)
 const createOpen = ref(false)
+const editingApp = ref<AppItem | null>(null)
 const slugTouched = ref(false)
 const errorMessage = ref('')
 const form = reactive({
@@ -22,6 +23,7 @@ const form = reactive({
   slug: '',
   bundleId: '',
   defaultChannel: 'latest',
+  enabled: true,
   description: ''
 })
 
@@ -30,7 +32,7 @@ const query = computed(() => ({
   includeDisabled: includeDisabled.value ? 'true' : undefined
 }))
 
-const { data, status, refresh } = await useFetch<{ items: AppItem[], total: number }>('/api/apps', {
+const { data, status, refresh } = useLazyFetch<{ items: AppItem[], total: number }>('/api/apps', {
   query,
   watch: [query]
 })
@@ -58,6 +60,20 @@ function onSlugInput(value: string) {
 
 function openCreateModal() {
   resetForm()
+  editingApp.value = null
+  createOpen.value = true
+}
+
+function openEditModal(app: AppItem) {
+  editingApp.value = app
+  form.name = app.name
+  form.slug = app.slug
+  form.bundleId = app.bundleId
+  form.defaultChannel = app.defaultChannel
+  form.enabled = app.enabled
+  form.description = app.description || ''
+  slugTouched.value = true
+  errorMessage.value = ''
   createOpen.value = true
 }
 
@@ -66,31 +82,33 @@ function resetForm() {
   form.slug = ''
   form.bundleId = ''
   form.defaultChannel = 'latest'
+  form.enabled = true
   form.description = ''
   slugTouched.value = false
   errorMessage.value = ''
 }
 
-async function createApp() {
+async function submitApp() {
   errorMessage.value = ''
   creating.value = true
 
   try {
-    await $fetch('/api/apps', {
-      method: 'POST',
+    await $fetch(editingApp.value ? `/api/apps/${editingApp.value.id}` : '/api/apps', {
+      method: editingApp.value ? 'PATCH' : 'POST',
       body: form
     })
     toast.add({
-      title: '应用已创建',
+      title: editingApp.value ? '应用已更新' : '应用已创建',
       color: 'success'
     })
     createOpen.value = false
+    editingApp.value = null
     resetForm()
     await refresh()
   } catch (error) {
     errorMessage.value = error && typeof error === 'object' && 'statusMessage' in error
       ? String(error.statusMessage)
-      : '创建失败'
+      : editingApp.value ? '更新失败' : '创建失败'
   } finally {
     creating.value = false
   }
@@ -119,11 +137,21 @@ async function disableApp(app: AppItem) {
           </h1>
         </div>
 
-        <UButton
-          icon="i-lucide-plus"
-          label="创建应用"
-          @click="openCreateModal"
-        />
+        <div class="flex gap-2">
+          <UButton
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-refresh-cw"
+            label="刷新"
+            :loading="status === 'pending'"
+            @click="refresh"
+          />
+          <UButton
+            icon="i-lucide-plus"
+            label="创建应用"
+            @click="openCreateModal"
+          />
+        </div>
       </div>
     </section>
 
@@ -209,9 +237,16 @@ async function disableApp(app: AppItem) {
                       <UButton
                         color="neutral"
                         variant="ghost"
-                        icon="i-lucide-pencil"
+                        icon="i-lucide-eye"
                         :to="`/apps/${app.id}`"
-                        aria-label="编辑"
+                        aria-label="详情"
+                      />
+                      <UButton
+                        color="neutral"
+                        variant="ghost"
+                        icon="i-lucide-pencil"
+                        aria-label="修改"
+                        @click="openEditModal(app)"
                       />
                       <UButton
                         v-if="app.enabled"
@@ -233,12 +268,12 @@ async function disableApp(app: AppItem) {
 
     <UModal
       v-model:open="createOpen"
-      title="创建应用"
-      description="为 Electron 客户端创建一个升级管理对象。"
+      :title="editingApp ? '修改应用' : '创建应用'"
+      :description="editingApp ? '变更应用的基础信息。' : '为 Electron 客户端创建一个升级管理对象。'"
       :ui="{ footer: 'justify-end' }"
     >
       <template #body>
-        <form id="create-app-form" class="grid gap-4" @submit.prevent="createApp">
+        <form id="app-form" class="grid gap-4" @submit.prevent="submitApp">
           <UAlert
             v-if="errorMessage"
             color="error"
@@ -273,6 +308,8 @@ async function disableApp(app: AppItem) {
             <UInput v-model="form.defaultChannel" class="w-full" placeholder="latest" />
           </UFormField>
 
+          <USwitch v-model="form.enabled" label="启用应用" />
+
           <UFormField label="描述" name="description">
             <UTextarea v-model="form.description" class="w-full" :rows="3" />
           </UFormField>
@@ -288,7 +325,7 @@ async function disableApp(app: AppItem) {
         />
         <UButton
           type="submit"
-          form="create-app-form"
+          form="app-form"
           icon="i-lucide-save"
           label="保存"
           :loading="creating"

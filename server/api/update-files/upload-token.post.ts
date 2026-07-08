@@ -38,16 +38,16 @@ export default defineEventHandler(async (event) => {
     fileName: body.fileName
   }, oss)
   const contentType = body.contentType || 'application/octet-stream'
+  const uploadRequest = createSignedUploadRequest(objectKey, contentType, oss)
 
   return {
-    method: 'PUT',
-    uploadUrl: createSignedUploadUrl(objectKey, contentType, oss),
+    method: uploadRequest.method,
+    uploadUrl: uploadRequest.uploadUrl,
     objectKey,
     storageConfigId: oss.id || null,
     bucket: oss.bucket,
     endpoint: oss.endpoint,
-    headers: {
-      'Content-Type': contentType
-    }
+    headers: uploadRequest.headers,
+    fields: uploadRequest.fields
   }
 })

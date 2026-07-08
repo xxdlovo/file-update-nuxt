@@ -19,6 +19,10 @@ const navigation = [{
   icon: 'i-lucide-database',
   to: '/storage-configs'
 }, {
+  label: '日志查看',
+  icon: 'i-lucide-list-checks',
+  to: '/logs'
+}, {
   label: '设置',
   icon: 'i-lucide-settings',
   to: '/settings'

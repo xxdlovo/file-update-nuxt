@@ -23,5 +23,19 @@ export default defineEventHandler(async (event) => {
     }
   })
 
-  return publishAppVersion(version, targets)
+  const result = await publishAppVersion(version, targets)
+
+  await writeAuditLog(event, {
+    action: 'app_version.publish',
+    resourceType: 'app_version',
+    resourceId: version.id,
+    metadata: {
+      appId: version.appId,
+      version: version.version,
+      channel: version.channel,
+      targets: targets || 'all'
+    }
+  })
+
+  return result
 })

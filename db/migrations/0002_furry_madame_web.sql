@@ -1,0 +1,1 @@
+ALTER TABLE `file_versions` ADD `storage_config_id` integer REFERENCES storage_configs(id);

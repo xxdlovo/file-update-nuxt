@@ -16,5 +16,14 @@ export default defineEventHandler(async (event) => {
     .where(eq(apps.id, id))
     .returning()
 
+  await writeAuditLog(event, {
+    action: 'app.disable',
+    resourceType: 'app',
+    resourceId: app.id,
+    metadata: {
+      slug: app.slug
+    }
+  })
+
   return app
 })

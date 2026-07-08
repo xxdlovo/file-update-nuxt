@@ -31,18 +31,20 @@ type UpdateFile = {
 }
 
 type UploadToken = {
-  method: 'PUT'
+  method: 'PUT' | 'POST'
   uploadUrl: string
   objectKey: string
   storageConfigId: number | null
   bucket: string
   endpoint?: string
   headers: Record<string, string>
+  fields?: Record<string, string>
 }
 
 type StorageConfigOption = {
   id: number
   name: string
+  provider: string
   bucket: string
   region: string
 }
@@ -50,31 +52,25 @@ type StorageConfigOption = {
 const route = useRoute()
 const toast = useToast()
 const versionId = computed(() => String(route.params.id))
-const saving = ref(false)
 const revoking = ref(false)
 const publishing = ref(false)
 const rollingBack = ref(false)
 const uploading = ref(false)
 const uploadOpen = ref(false)
-const errorMessage = ref('')
+const deleteFileOpen = ref(false)
+const deletingFile = ref(false)
+const deleteFileObject = ref(false)
 const uploadError = ref('')
 const selectedFile = ref<File | null>(null)
+const pendingDeleteFile = ref<UpdateFile | null>(null)
 
-const { data: version, refresh } = await useFetch<VersionDetail>(() => `/api/versions/${versionId.value}`)
-const { data: filesData, refresh: refreshFiles } = await useFetch<{ items: UpdateFile[], total: number }>(
+const { data: version, refresh } = useLazyFetch<VersionDetail>(() => `/api/versions/${versionId.value}`)
+const { data: filesData, refresh: refreshFiles } = useLazyFetch<{ items: UpdateFile[], total: number }>(
   () => `/api/versions/${versionId.value}/files`
 )
-const { data: storageConfigsData } = await useFetch<{ items: StorageConfigOption[], total: number }>(
+const { data: storageConfigsData } = useLazyFetch<{ items: StorageConfigOption[], total: number }>(
   '/api/storage-configs?verified=true'
 )
-
-const form = reactive({
-  version: '',
-  buildNumber: '',
-  channel: 'latest',
-  forceUpdate: false,
-  releaseNotes: ''
-})
 
 const uploadForm = reactive({
   storageConfigId: null as number | null,
@@ -86,24 +82,22 @@ const uploadForm = reactive({
 const files = computed(() => filesData.value?.items || [])
 const storageConfigs = computed(() => storageConfigsData.value?.items || [])
 const storageConfigItems = computed(() => storageConfigs.value.map(config => ({
-  label: `${config.name} / ${config.bucket}`,
+  label: `${config.name} / ${providerLabel(config.provider)} / ${config.bucket}`,
   value: config.id
 })))
 const platformItems = ['win32', 'darwin', 'linux']
 const archItems = ['x64', 'arm64']
 const packageTypeItems = ['full', 'delta', 'blockmap', 'metadata']
 
-watch(version, (value) => {
-  if (!value) {
-    return
-  }
-
-  form.version = value.version
-  form.buildNumber = value.buildNumber || ''
-  form.channel = value.channel
-  form.forceUpdate = value.forceUpdate
-  form.releaseNotes = value.releaseNotes || ''
-}, { immediate: true })
+function providerLabel(provider: string) {
+  return {
+    aliyun_oss: '阿里云 OSS',
+    tencent_cos: '腾讯云 COS',
+    qiniu_kodo: '七牛云 Kodo',
+    aws_s3: 'AWS S3',
+    upyun_uss: 'UPYUN USS'
+  }[provider] || provider
+}
 
 watch(storageConfigs, (value) => {
   if (!uploadForm.storageConfigId && value[0]) {
@@ -160,27 +154,38 @@ function onFileChange(event: Event) {
   selectedFile.value = input.files?.[0] || null
 }
 
-async function saveVersion() {
-  errorMessage.value = ''
-  saving.value = true
+async function uploadObject(token: UploadToken, file: File) {
+  if (token.method === 'POST') {
+    const form = new FormData()
 
-  try {
-    await $fetch(`/api/versions/${versionId.value}`, {
-      method: 'PATCH',
+    for (const [key, value] of Object.entries(token.fields || {})) {
+      form.append(key, value)
+    }
+    form.append('file', file)
+
+    return fetch(token.uploadUrl, {
+      method: 'POST',
       body: form
     })
-    toast.add({
-      title: '版本已保存',
-      color: 'success'
-    })
-    await refresh()
-  } catch (error) {
-    errorMessage.value = error && typeof error === 'object' && 'statusMessage' in error
-      ? String(error.statusMessage)
-      : '保存失败'
-  } finally {
-    saving.value = false
   }
+
+  return fetch(token.uploadUrl, {
+    method: token.method,
+    headers: token.headers,
+    body: file
+  })
+}
+
+async function refreshPage() {
+  await Promise.all([
+    refresh(),
+    refreshFiles()
+  ])
+  toast.add({
+    title: '页面已刷新',
+    color: 'success',
+    icon: 'i-lucide-refresh-cw'
+  })
 }
 
 async function revokeVersion() {
@@ -278,14 +283,10 @@ async function uploadFile() {
       }
     })
 
-    const response = await fetch(token.uploadUrl, {
-      method: token.method,
-      headers: token.headers,
-      body: file
-    })
+    const response = await uploadObject(token, file)
 
     if (!response.ok) {
-      throw new Error(`OSS upload failed with ${response.status}`)
+      throw new Error(`Object storage upload failed with ${response.status}`)
     }
 
     const [sha256, sha512] = await Promise.all([
@@ -322,21 +323,44 @@ async function uploadFile() {
   } catch (error) {
     uploadError.value = error instanceof Error
       ? error.message
-      : '上传失败，请检查 OSS 配置'
+      : '上传失败，请检查对象存储配置'
   } finally {
     uploading.value = false
   }
 }
 
-async function deleteFile(file: UpdateFile) {
-  await $fetch(`/api/update-files/${file.id}`, {
-    method: 'DELETE'
-  })
-  toast.add({
-    title: '文件记录已删除',
-    color: 'success'
-  })
-  await refreshFiles()
+function openDeleteFile(file: UpdateFile) {
+  pendingDeleteFile.value = file
+  deleteFileObject.value = false
+  deleteFileOpen.value = true
+}
+
+async function deleteFile() {
+  if (!pendingDeleteFile.value) {
+    return
+  }
+
+  deletingFile.value = true
+
+  try {
+    await $fetch(`/api/update-files/${pendingDeleteFile.value.id}`, {
+      method: 'DELETE',
+      body: {
+        deleteObject: deleteFileObject.value,
+        confirmObjectKey: deleteFileObject.value ? pendingDeleteFile.value.objectKey : ''
+      }
+    })
+    toast.add({
+      title: '文件记录已删除',
+      color: 'success'
+    })
+    deleteFileOpen.value = false
+    pendingDeleteFile.value = null
+    deleteFileObject.value = false
+    await refreshFiles()
+  } finally {
+    deletingFile.value = false
+  }
 }
 </script>
 
@@ -365,9 +389,9 @@ async function deleteFile(file: UpdateFile) {
           <UButton
             color="neutral"
             variant="outline"
-            icon="i-lucide-upload"
-            label="上传文件"
-            @click="uploadOpen = true"
+            icon="i-lucide-refresh-cw"
+            label="刷新"
+            @click="refreshPage"
           />
           <UButton
             v-if="version?.status !== 'published'"
@@ -398,12 +422,6 @@ async function deleteFile(file: UpdateFile) {
             :loading="revoking"
             @click="revokeVersion"
           />
-          <UButton
-            icon="i-lucide-save"
-            label="保存"
-            :loading="saving"
-            @click="saveVersion"
-          />
         </div>
       </div>
     </section>
@@ -422,41 +440,50 @@ async function deleteFile(file: UpdateFile) {
             </div>
           </template>
 
-          <form class="grid gap-4 lg:grid-cols-2" @submit.prevent="saveVersion">
-            <UAlert
-              v-if="errorMessage"
-              class="lg:col-span-2"
-              color="error"
-              variant="soft"
-              icon="i-lucide-circle-alert"
-              :title="errorMessage"
-            />
-
-            <UFormField
-              label="版本号"
-              name="version"
-              description="MVP 阶段使用标准 semver，例如 1.2.0。"
-              required
-            >
-              <UInput v-model="form.version" class="w-full" />
-            </UFormField>
-
-            <UFormField label="构建号" name="buildNumber">
-              <UInput v-model="form.buildNumber" class="w-full" />
-            </UFormField>
-
-            <UFormField label="通道" name="channel" required>
-              <UInput v-model="form.channel" class="w-full" />
-            </UFormField>
-
-            <div class="flex items-end">
-              <USwitch v-model="form.forceUpdate" label="强制更新" />
+          <div class="grid gap-4 text-sm lg:grid-cols-2">
+            <div>
+              <p class="text-muted">
+                版本号
+              </p>
+              <p class="mt-1 font-medium">
+                {{ version?.version || '-' }}
+              </p>
             </div>
 
-            <UFormField class="lg:col-span-2" label="更新说明" name="releaseNotes">
-              <UTextarea v-model="form.releaseNotes" class="w-full" :rows="8" />
-            </UFormField>
-          </form>
+            <div>
+              <p class="text-muted">
+                构建号
+              </p>
+              <p class="mt-1">
+                {{ version?.buildNumber || '-' }}
+              </p>
+            </div>
+
+            <div>
+              <p class="text-muted">
+                通道
+              </p>
+              <UBadge class="mt-1" color="neutral" variant="subtle" :label="version?.channel || '-'" />
+            </div>
+
+            <div>
+              <p class="text-muted">
+                强制更新
+              </p>
+              <p class="mt-1">
+                {{ version?.forceUpdate ? '是' : '否' }}
+              </p>
+            </div>
+
+            <div class="lg:col-span-2">
+              <p class="text-muted">
+                更新说明
+              </p>
+              <p class="mt-1 whitespace-pre-wrap">
+                {{ version?.releaseNotes || '-' }}
+              </p>
+            </div>
+          </div>
         </UCard>
 
         <UCard>
@@ -471,11 +498,20 @@ async function deleteFile(file: UpdateFile) {
                 </p>
               </div>
 
-              <UButton
-                icon="i-lucide-upload"
-                label="上传文件"
-                @click="uploadOpen = true"
-              />
+              <div class="flex gap-2">
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-refresh-cw"
+                  label="刷新"
+                  @click="refreshFiles"
+                />
+                <UButton
+                  icon="i-lucide-upload"
+                  label="上传文件"
+                  @click="uploadOpen = true"
+                />
+              </div>
             </div>
           </template>
 
@@ -536,7 +572,7 @@ async function deleteFile(file: UpdateFile) {
                           variant="ghost"
                           icon="i-lucide-trash"
                           aria-label="删除文件记录"
-                          @click="deleteFile(file)"
+                          @click="openDeleteFile(file)"
                         />
                       </div>
                     </td>
@@ -579,12 +615,12 @@ async function deleteFile(file: UpdateFile) {
         <UCard>
           <template #header>
             <h2 class="text-base font-semibold">
-              OSS 直传
+              对象存储直传
             </h2>
           </template>
 
           <p class="text-sm text-muted">
-            上传会先向服务端申请短期 PUT 签名 URL，再由浏览器直接上传到阿里云 OSS。
+            上传会先向服务端申请短期上传凭证，再由浏览器直接上传到已验证的对象存储。
           </p>
         </UCard>
       </aside>
@@ -593,7 +629,7 @@ async function deleteFile(file: UpdateFile) {
     <UModal
       v-model:open="uploadOpen"
       title="上传升级文件"
-      description="选择目标平台、架构和包类型后，将文件直传到阿里云 OSS。"
+      description="选择目标平台、架构和包类型后，将文件直传到已验证的对象存储。"
       :ui="{ footer: 'justify-end' }"
     >
       <template #body>
@@ -612,7 +648,7 @@ async function deleteFile(file: UpdateFile) {
             variant="soft"
             icon="i-lucide-triangle-alert"
             title="暂无可用存储配置"
-            description="请先到存储配置页面新增并验证阿里云 OSS。"
+            description="请先到存储配置页面新增并验证对象存储。"
           />
 
           <UFormField label="存储配置" name="storageConfigId" required>
@@ -620,7 +656,7 @@ async function deleteFile(file: UpdateFile) {
               v-model="uploadForm.storageConfigId"
               class="w-full"
               :items="storageConfigItems"
-              placeholder="选择已验证的 OSS 配置"
+              placeholder="选择已验证的对象存储配置"
             />
           </UFormField>
 
@@ -677,6 +713,48 @@ async function deleteFile(file: UpdateFile) {
           label="上传"
           :disabled="storageConfigItems.length === 0"
           :loading="uploading"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="deleteFileOpen"
+      title="删除升级文件记录"
+      description="默认只删除数据库记录，勾选后会同步删除对象存储中的文件。"
+      :ui="{ footer: 'justify-end' }"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UAlert
+            color="error"
+            variant="soft"
+            icon="i-lucide-triangle-alert"
+            :title="`确认删除 ${pendingDeleteFile?.fileName || ''}？`"
+            :description="pendingDeleteFile?.objectKey || '删除后可重新上传文件记录。'"
+          />
+
+          <UCheckbox
+            v-model="deleteFileObject"
+            :disabled="!pendingDeleteFile?.objectKey"
+            label="同时删除对象存储中的文件"
+          />
+        </div>
+      </template>
+
+      <template #footer="{ close }">
+        <UButton
+          color="neutral"
+          variant="outline"
+          label="取消"
+          :disabled="deletingFile"
+          @click="close"
+        />
+        <UButton
+          color="error"
+          icon="i-lucide-trash"
+          label="删除记录"
+          :loading="deletingFile"
+          @click="deleteFile"
         />
       </template>
     </UModal>

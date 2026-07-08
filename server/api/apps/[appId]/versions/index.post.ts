@@ -37,6 +37,17 @@ export default defineEventHandler(async (event) => {
       releaseNotes: body.releaseNotes?.trim() || null
     }).returning()
 
+    await writeAuditLog(event, {
+      action: 'app_version.create',
+      resourceType: 'app_version',
+      resourceId: created.id,
+      metadata: {
+        appId: app.id,
+        version: created.version,
+        channel: created.channel
+      }
+    })
+
     return created
   } catch {
     throw createError({

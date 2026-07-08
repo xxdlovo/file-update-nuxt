@@ -41,6 +41,16 @@ export default defineEventHandler(async (event) => {
       description: body.description?.trim() || null
     }).returning()
 
+    await writeAuditLog(event, {
+      action: 'app.create',
+      resourceType: 'app',
+      resourceId: app.id,
+      metadata: {
+        slug: app.slug,
+        bundleId: app.bundleId
+      }
+    })
+
     return app
   } catch {
     throw createError({

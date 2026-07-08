@@ -70,6 +70,16 @@ export default defineEventHandler(async (event) => {
       .where(eq(apps.id, id))
       .returning()
 
+    await writeAuditLog(event, {
+      action: 'app.update',
+      resourceType: 'app',
+      resourceId: app.id,
+      metadata: {
+        slug: app.slug,
+        changed: Object.keys(values).filter(key => key !== 'updatedAt')
+      }
+    })
+
     return app
   } catch {
     throw createError({

@@ -3,6 +3,7 @@ import { storageConfigs } from '../../db/schema'
 
 type StorageConfigInput = {
   name?: string
+  provider?: string
   region?: string
   accessKeyId?: string
   accessKeySecret?: string
@@ -37,8 +38,9 @@ export function sanitizeStorageConfig(config: typeof storageConfigs.$inferSelect
 }
 
 export function normalizeStorageConfigInput(input: StorageConfigInput, requireSecret = true) {
+  const provider = normalizeStorageProvider(input.provider)
   const name = input.name?.trim()
-  const region = input.region?.trim()
+  const region = provider === 'upyun_uss' ? 'global' : input.region?.trim()
   const accessKeyId = input.accessKeyId?.trim()
   const accessKeySecret = input.accessKeySecret?.trim()
   const bucket = input.bucket?.trim()
@@ -52,12 +54,12 @@ export function normalizeStorageConfigInput(input: StorageConfigInput, requireSe
 
   return {
     name,
-    provider: 'aliyun_oss',
+    provider,
     region,
     accessKeyId,
     accessKeySecret,
     bucket,
-    endpoint: input.endpoint?.trim() || null,
+    endpoint: provider === 'upyun_uss' ? 's3.api.upyun.com' : input.endpoint?.trim() || null,
     publicBaseUrl: input.publicBaseUrl?.trim() || null,
     uploadDir: input.uploadDir?.trim() || 'electron-updates',
     fileReleaseDir: input.fileReleaseDir?.trim() || 'files',

@@ -36,6 +36,16 @@ export default defineEventHandler(async (event) => {
     loggedInAt: new Date().toISOString()
   })
 
+  await writeAuditLog(event, {
+    userId: user.id,
+    action: 'login',
+    resourceType: 'user',
+    resourceId: user.id,
+    metadata: {
+      email: user.email
+    }
+  })
+
   return {
     user: {
       id: user.id,

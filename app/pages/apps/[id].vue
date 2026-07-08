@@ -22,33 +22,33 @@ type AppVersion = {
   updatedAt: string
 }
 
+type VersionFile = {
+  id: number
+  objectKey: string
+}
+
 const route = useRoute()
 const toast = useToast()
+const requestUrl = useRequestURL()
 const appId = computed(() => String(route.params.id))
-const saving = ref(false)
 const creatingVersion = ref(false)
 const versionModalOpen = ref(false)
-const errorMessage = ref('')
+const deleteVersionOpen = ref(false)
+const deletingVersion = ref(false)
 const versionError = ref('')
+const pendingDeleteVersion = ref<AppVersion | null>(null)
+const deleteVersionObjects = ref(false)
+const pendingDeleteObjectKeys = ref<string[]>([])
 const endpointForm = reactive({
   channel: 'latest',
   platform: 'win32',
   arch: 'x64'
 })
 
-const { data: app, refresh } = await useFetch<AppDetail>(() => `/api/apps/${appId.value}`)
-const { data: versionsData, refresh: refreshVersions } = await useFetch<{ items: AppVersion[], total: number }>(
+const { data: app, refresh } = useLazyFetch<AppDetail>(() => `/api/apps/${appId.value}`)
+const { data: versionsData, refresh: refreshVersions } = useLazyFetch<{ items: AppVersion[], total: number }>(
   () => `/api/apps/${appId.value}/versions`
 )
-
-const form = reactive({
-  name: '',
-  slug: '',
-  bundleId: '',
-  defaultChannel: 'latest',
-  enabled: true,
-  description: ''
-})
 
 const versionForm = reactive({
   version: '',
@@ -81,7 +81,7 @@ const origin = computed(() => {
     return window.location.origin
   }
 
-  return ''
+  return requestUrl.origin
 })
 const updaterMetadataFile = computed(() => {
   if (endpointForm.platform === 'darwin') {
@@ -131,12 +131,6 @@ watch(app, (value) => {
     return
   }
 
-  form.name = value.name
-  form.slug = value.slug
-  form.bundleId = value.bundleId
-  form.defaultChannel = value.defaultChannel
-  form.enabled = value.enabled
-  form.description = value.description || ''
   versionForm.channel = value.defaultChannel
   endpointForm.channel = value.defaultChannel
 }, { immediate: true })
@@ -175,27 +169,16 @@ function statusColor(status: string) {
   return 'neutral'
 }
 
-async function saveApp() {
-  errorMessage.value = ''
-  saving.value = true
-
-  try {
-    await $fetch(`/api/apps/${appId.value}`, {
-      method: 'PATCH',
-      body: form
-    })
-    toast.add({
-      title: '应用已保存',
-      color: 'success'
-    })
-    await refresh()
-  } catch (error) {
-    errorMessage.value = error && typeof error === 'object' && 'statusMessage' in error
-      ? String(error.statusMessage)
-      : '保存失败'
-  } finally {
-    saving.value = false
-  }
+async function refreshPage() {
+  await Promise.all([
+    refresh(),
+    refreshVersions()
+  ])
+  toast.add({
+    title: '页面已刷新',
+    color: 'success',
+    icon: 'i-lucide-refresh-cw'
+  })
 }
 
 async function createVersion() {
@@ -221,6 +204,45 @@ async function createVersion() {
       : '创建版本失败'
   } finally {
     creatingVersion.value = false
+  }
+}
+
+async function openDeleteVersion(version: AppVersion) {
+  pendingDeleteVersion.value = version
+  deleteVersionObjects.value = false
+  pendingDeleteObjectKeys.value = []
+  deleteVersionOpen.value = true
+
+  const result = await $fetch<{ items: VersionFile[], total: number }>(`/api/versions/${version.id}/files`)
+  pendingDeleteObjectKeys.value = result.items.map(file => file.objectKey).filter(Boolean)
+}
+
+async function deleteVersion() {
+  if (!pendingDeleteVersion.value) {
+    return
+  }
+
+  deletingVersion.value = true
+
+  try {
+    await $fetch(`/api/versions/${pendingDeleteVersion.value.id}`, {
+      method: 'DELETE',
+      body: {
+        deleteObjects: deleteVersionObjects.value,
+        confirmObjectKeys: deleteVersionObjects.value ? pendingDeleteObjectKeys.value : []
+      }
+    })
+    toast.add({
+      title: '版本已删除',
+      color: 'success'
+    })
+    deleteVersionOpen.value = false
+    pendingDeleteVersion.value = null
+    deleteVersionObjects.value = false
+    pendingDeleteObjectKeys.value = []
+    await refreshVersions()
+  } finally {
+    deletingVersion.value = false
   }
 }
 
@@ -259,21 +281,13 @@ async function copyText(value: string, label: string) {
           </p>
         </div>
 
-        <div class="flex gap-2">
-          <UButton
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-plus"
-            label="创建版本"
-            @click="openVersionModal"
-          />
-          <UButton
-            icon="i-lucide-save"
-            label="保存应用"
-            :loading="saving"
-            @click="saveApp"
-          />
-        </div>
+        <UButton
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-refresh-cw"
+          label="刷新"
+          @click="refreshPage"
+        />
       </div>
     </section>
 
@@ -291,45 +305,50 @@ async function copyText(value: string, label: string) {
             </div>
           </template>
 
-          <form class="grid gap-4 lg:grid-cols-2" @submit.prevent="saveApp">
-            <UAlert
-              v-if="errorMessage"
-              class="lg:col-span-2"
-              color="error"
-              variant="soft"
-              icon="i-lucide-circle-alert"
-              :title="errorMessage"
-            />
+          <div class="grid gap-4 text-sm lg:grid-cols-2">
+            <div>
+              <p class="text-muted">
+                应用名称
+              </p>
+              <p class="mt-1 font-medium">
+                {{ app?.name || '-' }}
+              </p>
+            </div>
 
-            <UFormField label="应用名称" name="name" required>
-              <UInput v-model="form.name" class="w-full" />
-            </UFormField>
+            <div>
+              <p class="text-muted">
+                Slug
+              </p>
+              <code class="mt-1 block break-all rounded bg-elevated px-2 py-1 text-xs">
+                {{ app?.slug || '-' }}
+              </code>
+            </div>
 
-            <UFormField
-              label="Slug"
-              name="slug"
-              description="用于 URL 和更新接口路径，只能包含小写英文、数字和短横线。"
-              required
-            >
-              <UInput v-model="form.slug" class="w-full" />
-            </UFormField>
+            <div>
+              <p class="text-muted">
+                Bundle ID
+              </p>
+              <p class="mt-1">
+                {{ app?.bundleId || '-' }}
+              </p>
+            </div>
 
-            <UFormField label="Bundle ID" name="bundleId" required>
-              <UInput v-model="form.bundleId" class="w-full" />
-            </UFormField>
-
-            <UFormField label="默认通道" name="defaultChannel" required>
-              <UInput v-model="form.defaultChannel" class="w-full" />
-            </UFormField>
-
-            <UFormField class="lg:col-span-2" label="描述" name="description">
-              <UTextarea v-model="form.description" class="w-full" :rows="4" />
-            </UFormField>
+            <div>
+              <p class="text-muted">
+                默认通道
+              </p>
+              <UBadge class="mt-1" color="neutral" variant="subtle" :label="app?.defaultChannel || '-'" />
+            </div>
 
             <div class="lg:col-span-2">
-              <USwitch v-model="form.enabled" label="启用应用" />
+              <p class="text-muted">
+                描述
+              </p>
+              <p class="mt-1 whitespace-pre-wrap">
+                {{ app?.description || '-' }}
+              </p>
             </div>
-          </form>
+          </div>
         </UCard>
 
         <UCard>
@@ -414,6 +433,13 @@ async function copyText(value: string, label: string) {
                           icon="i-lucide-pencil"
                           :to="`/versions/${version.id}`"
                           aria-label="编辑"
+                        />
+                        <UButton
+                          color="error"
+                          variant="ghost"
+                          icon="i-lucide-trash"
+                          aria-label="删除版本"
+                          @click="openDeleteVersion(version)"
                         />
                       </div>
                     </td>
@@ -574,6 +600,61 @@ async function copyText(value: string, label: string) {
           icon="i-lucide-save"
           label="保存"
           :loading="creatingVersion"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="deleteVersionOpen"
+      title="删除版本"
+      description="删除后会移除该版本的数据库记录、关联升级文件记录和发布指针。"
+      :ui="{ footer: 'justify-end' }"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UAlert
+            color="error"
+            variant="soft"
+            icon="i-lucide-triangle-alert"
+            :title="`确认删除版本 ${pendingDeleteVersion?.version || ''}？`"
+            description="此操作会删除版本记录、关联文件记录和发布指针。"
+          />
+
+          <UCheckbox
+            v-model="deleteVersionObjects"
+            :disabled="pendingDeleteObjectKeys.length === 0"
+            label="同时删除对象存储中的文件"
+          />
+
+          <div v-if="pendingDeleteObjectKeys.length > 0" class="space-y-2">
+            <p class="text-sm text-muted">
+              将删除以下对象：
+            </p>
+            <code class="block max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-elevated px-3 py-2 text-xs">
+              {{ pendingDeleteObjectKeys.join('\n') }}
+            </code>
+          </div>
+
+          <p v-else class="text-sm text-muted">
+            该版本暂无关联上传文件。
+          </p>
+        </div>
+      </template>
+
+      <template #footer="{ close }">
+        <UButton
+          color="neutral"
+          variant="outline"
+          label="取消"
+          :disabled="deletingVersion"
+          @click="close"
+        />
+        <UButton
+          color="error"
+          icon="i-lucide-trash"
+          label="删除"
+          :loading="deletingVersion"
+          @click="deleteVersion"
         />
       </template>
     </UModal>
