@@ -10,6 +10,7 @@ type StorageConfigInput = {
   bucket?: string
   endpoint?: string | null
   publicBaseUrl?: string | null
+  cdnAuthToken?: string | null
   uploadDir?: string
   fileReleaseDir?: string
   enabled?: boolean
@@ -25,6 +26,7 @@ export function sanitizeStorageConfig(config: typeof storageConfigs.$inferSelect
     bucket: config.bucket,
     endpoint: config.endpoint,
     publicBaseUrl: config.publicBaseUrl,
+    cdnAuthTokenConfigured: Boolean(config.cdnAuthToken),
     uploadDir: config.uploadDir,
     fileReleaseDir: config.fileReleaseDir,
     enabled: config.enabled,
@@ -61,6 +63,7 @@ export function normalizeStorageConfigInput(input: StorageConfigInput, requireSe
     bucket,
     endpoint: provider === 'upyun_uss' ? 's3.api.upyun.com' : input.endpoint?.trim() || null,
     publicBaseUrl: input.publicBaseUrl?.trim() || null,
+    cdnAuthToken: input.cdnAuthToken?.trim() || null,
     uploadDir: input.uploadDir?.trim() || 'electron-updates',
     fileReleaseDir: input.fileReleaseDir?.trim() || 'files',
     enabled: input.enabled ?? true

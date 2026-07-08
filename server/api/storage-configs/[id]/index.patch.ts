@@ -14,7 +14,8 @@ export default defineEventHandler(async (event) => {
     ...existing,
     ...body,
     accessKeyId,
-    accessKeySecret: body.accessKeySecret?.trim() || existing.accessKeySecret
+    accessKeySecret: body.accessKeySecret?.trim() || existing.accessKeySecret,
+    cdnAuthToken: body.cdnAuthToken?.trim() || existing.cdnAuthToken
   })
   const db = useDb()
 

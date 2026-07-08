@@ -13,6 +13,7 @@ type OssConfig = {
   bucket: string
   endpoint?: string | null
   publicBaseUrl?: string | null
+  cdnAuthToken?: string | null
   uploadDir?: string | null
   fileReleaseDir?: string | null
 }
@@ -317,11 +318,11 @@ function createSignedObjectUrl(
   oss: OssConfig,
   contentType = ''
 ) {
-  if (method === 'GET' && oss.publicBaseUrl) {
+  const provider = normalizeStorageProvider(oss.provider)
+
+  if (method === 'GET' && oss.publicBaseUrl && provider !== 'aliyun_oss') {
     return createObjectUrl(objectKey, oss)
   }
-
-  const provider = normalizeStorageProvider(oss.provider)
 
   if (provider === 'aliyun_oss') {
     return createAliyunSignedUrl(method, objectKey, oss, contentType)
@@ -361,7 +362,10 @@ function createAliyunSignedUrl(method: 'GET' | 'PUT' | 'DELETE', objectKey: stri
   const signature = createHmac('sha1', oss.accessKeySecret)
     .update(stringToSign)
     .digest('base64')
-  const url = new URL(createObjectUrl(objectKey, oss))
+  const url = new URL(createObjectUrl(objectKey, {
+    ...oss,
+    publicBaseUrl: null
+  }))
 
   url.searchParams.set('OSSAccessKeyId', oss.accessKeyId)
   url.searchParams.set('Expires', String(expiresAt))
@@ -711,7 +715,11 @@ function qiniuEntry(oss: OssConfig, objectKey: string) {
 
 function createObjectUrl(objectKey: string, oss: OssConfig) {
   if (oss.publicBaseUrl) {
-    return `${oss.publicBaseUrl.replace(/\/$/, '')}/${encodeObjectPath(objectKey)}`
+    const objectUrl = `${oss.publicBaseUrl.replace(/\/$/, '')}/${encodeObjectPath(objectKey)}`
+
+    return normalizeStorageProvider(oss.provider) === 'upyun_uss'
+      ? createUpyunCdnTokenUrl(objectUrl, oss)
+      : objectUrl
   }
 
   const provider = normalizeStorageProvider(oss.provider)
@@ -740,6 +748,34 @@ function createObjectUrl(objectKey: string, oss: OssConfig) {
   }
 
   return `https://${oss.bucket}.${normalizeEndpoint(oss) || `${oss.region}.aliyuncs.com`}/${encodeObjectPath(objectKey)}`
+}
+
+function createUpyunCdnTokenUrl(objectUrl: string, oss: OssConfig) {
+  if (!oss.cdnAuthToken) {
+    return objectUrl
+  }
+
+  const config = useRuntimeConfig()
+  const expires = Number(config.public.downloadUrlExpiresSeconds || 600)
+  const expiresAt = Math.floor(Date.now() / 1000) + expires
+  const url = new URL(objectUrl)
+  const pathname = decodeUrlPathname(url.pathname)
+  const signature = createHash('md5')
+    .update(`${oss.cdnAuthToken}&${expiresAt}&${pathname}`)
+    .digest('hex')
+    .slice(12, 20)
+
+  url.searchParams.set('_upt', `${signature}${expiresAt}`)
+
+  return url.toString()
+}
+
+function decodeUrlPathname(pathname: string) {
+  try {
+    return decodeURIComponent(pathname)
+  } catch {
+    return pathname
+  }
 }
 
 function normalizeEndpoint(oss: Pick<OssConfig, 'endpoint' | 'region'>) {

@@ -89,6 +89,7 @@ export const storageConfigs = sqliteTable('storage_configs', {
   bucket: text('bucket').notNull(),
   endpoint: text('endpoint'),
   publicBaseUrl: text('public_base_url'),
+  cdnAuthToken: text('cdn_auth_token'),
   uploadDir: text('upload_dir').notNull().default('electron-updates'),
   fileReleaseDir: text('file_release_dir').notNull().default('files'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

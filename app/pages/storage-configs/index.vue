@@ -10,6 +10,7 @@ type StorageConfig = {
   bucket: string
   endpoint: string | null
   publicBaseUrl: string | null
+  cdnAuthTokenConfigured: boolean
   uploadDir: string
   fileReleaseDir: string
   enabled: boolean
@@ -45,6 +46,7 @@ const providerLabels: Record<StorageProvider, string> = {
 }
 
 const toast = useToast()
+const defaultUpyunCdnAuthToken = 'yvAAxOQXup34nX'
 const createOpen = ref(false)
 const verifyConfirmOpen = ref(false)
 const creating = ref(false)
@@ -65,6 +67,7 @@ const form = reactive({
   bucket: '',
   endpoint: '',
   publicBaseUrl: '',
+  cdnAuthToken: '',
   uploadDir: 'electron-updates',
   fileReleaseDir: 'files',
   enabled: true
@@ -121,11 +124,18 @@ watch(() => form.provider, (provider) => {
       form.endpoint = ''
     }
 
+    if (form.cdnAuthToken === defaultUpyunCdnAuthToken) {
+      form.cdnAuthToken = ''
+    }
+
     return
   }
 
   form.region = 'global'
   form.endpoint = 's3.api.upyun.com'
+  if (!editingConfig.value && !form.cdnAuthToken) {
+    form.cdnAuthToken = defaultUpyunCdnAuthToken
+  }
 })
 
 function resetForm() {
@@ -137,6 +147,7 @@ function resetForm() {
   form.bucket = ''
   form.endpoint = ''
   form.publicBaseUrl = ''
+  form.cdnAuthToken = ''
   form.uploadDir = 'electron-updates'
   form.fileReleaseDir = 'files'
   form.enabled = true
@@ -159,6 +170,7 @@ function openEditModal(config: StorageConfig) {
   form.bucket = config.bucket
   form.endpoint = config.provider === 'upyun_uss' ? 's3.api.upyun.com' : config.endpoint || ''
   form.publicBaseUrl = config.publicBaseUrl || ''
+  form.cdnAuthToken = ''
   form.uploadDir = config.uploadDir
   form.fileReleaseDir = config.fileReleaseDir
   form.enabled = config.enabled
@@ -371,6 +383,12 @@ async function verifyConfig() {
                       variant="subtle"
                       :label="config.enabled ? '启用' : '停用'"
                     />
+                    <UBadge
+                      v-if="config.provider === 'upyun_uss' && config.cdnAuthTokenConfigured"
+                      color="primary"
+                      variant="subtle"
+                      label="CDN Token"
+                    />
                   </div>
                 </td>
                 <td class="px-4 py-3">
@@ -471,6 +489,20 @@ async function verifyConfig() {
 
           <UFormField label="公开访问域名" name="publicBaseUrl" :hint="publicBaseUrlHint">
             <UInput v-model="form.publicBaseUrl" class="w-full" placeholder="https://cdn.example.com" />
+          </UFormField>
+
+          <UFormField
+            v-if="form.provider === 'upyun_uss'"
+            label="CDN Token 防盗链密钥"
+            name="cdnAuthToken"
+            :hint="editingConfig ? '留空则保持不变' : '用于生成 _upt 参数'"
+          >
+            <UInput
+              v-model="form.cdnAuthToken"
+              class="w-full"
+              type="password"
+              placeholder="yvAAxOQXup34nX"
+            />
           </UFormField>
 
           <USwitch v-model="form.enabled" label="启用配置" />
