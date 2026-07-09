@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   const environment = String(query.env || query.environment || 'prod')
   const token = typeof query.token === 'string' ? query.token : ''
   const release = await getActiveFileRelease({
-    fileSlug,
+    fileProjectId: project.id,
     channel,
     environment
   })

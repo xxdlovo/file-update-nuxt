@@ -87,13 +87,31 @@ export async function getEnabledFileProjectBySlug(slug: string) {
 }
 
 export async function getActiveFileRelease(input: {
-  fileSlug: string
+  fileProjectId?: number
+  fileSlug?: string
   channel: string
   environment: string
 }) {
   const db = useDb()
+  let fileProjectId = input.fileProjectId
+
+  if (!fileProjectId && input.fileSlug) {
+    const project = await getEnabledFileProjectBySlug(input.fileSlug)
+
+    if (!project) {
+      return null
+    }
+
+    fileProjectId = project.id
+  }
+
+  if (!fileProjectId) {
+    return null
+  }
+
   const release = await db.query.fileReleases.findFirst({
     where: and(
+      eq(fileReleases.fileProjectId, fileProjectId),
       eq(fileReleases.channel, input.channel),
       eq(fileReleases.environment, input.environment),
       eq(fileReleases.active, true)
@@ -104,7 +122,11 @@ export async function getActiveFileRelease(input: {
     }
   })
 
-  if (!release || release.project.slug !== input.fileSlug || !release.project.enabled) {
+  if (!release || !release.project.enabled) {
+    return null
+  }
+
+  if (input.fileSlug && release.project.slug !== input.fileSlug) {
     return null
   }
 

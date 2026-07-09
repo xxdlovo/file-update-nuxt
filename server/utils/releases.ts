@@ -95,15 +95,32 @@ export async function revokeAppVersion(version: VersionWithApp) {
 }
 
 export async function getActiveAppRelease(input: {
-  appSlug: string
+  appId?: number
+  appSlug?: string
   channel: string
   platform: string
   arch: string
 }) {
   const db = useDb()
+  let appId = input.appId
+
+  if (!appId && input.appSlug) {
+    const app = await getEnabledAppBySlug(input.appSlug)
+
+    if (!app) {
+      return null
+    }
+
+    appId = app.id
+  }
+
+  if (!appId) {
+    return null
+  }
 
   return db.query.releases.findFirst({
     where: and(
+      eq(releases.appId, appId),
       eq(releases.channel, input.channel),
       eq(releases.platform, input.platform),
       eq(releases.arch, input.arch),
@@ -114,7 +131,11 @@ export async function getActiveAppRelease(input: {
       version: true
     }
   }).then(async (release) => {
-    if (!release || release.app.slug !== input.appSlug || !release.app.enabled) {
+    if (!release || !release.app.enabled) {
+      return null
+    }
+
+    if (input.appSlug && release.app.slug !== input.appSlug) {
       return null
     }
 

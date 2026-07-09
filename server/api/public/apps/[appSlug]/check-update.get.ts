@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const release = await getActiveAppRelease({
-    appSlug,
+    appId: app.id,
     channel,
     platform,
     arch

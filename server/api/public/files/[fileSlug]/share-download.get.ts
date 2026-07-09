@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const channel = String(query.channel || project.defaultChannel)
   const environment = String(query.env || query.environment || 'prod')
   const release = await getActiveFileRelease({
-    fileSlug,
+    fileProjectId: project.id,
     channel,
     environment
   })
