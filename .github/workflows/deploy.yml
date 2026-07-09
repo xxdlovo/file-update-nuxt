@@ -49,7 +49,7 @@ jobs:
       - name: Deploy by SSH
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ secrets.SERVER_HOST }}
+          host: ${{ secrets.SERVER_HOST_ONE }}
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
@@ -74,7 +74,7 @@ jobs:
               -e DOWNLOAD_URL_EXPIRES_SECONDS="${{ vars.DOWNLOAD_URL_EXPIRES_SECONDS }}" \
               -e UPDATE_TOKEN_REQUIRED="${{ vars.UPDATE_TOKEN_REQUIRED }}" \
               -e FILE_UPDATE_TOKEN_REQUIRED="${{ vars.FILE_UPDATE_TOKEN_REQUIRED }}" \
-              -e CI_API_TOKEN_SHA256="${{ secrets.CI_API_TOKEN_SHA256 }}" \
+              -e CI_API_TOKEN="${{ secrets.CI_API_TOKEN }}" \
               ${{ env.IMAGE_NAME }}
 
             sudo rm -f ~/.docker/config.json
@@ -91,7 +91,7 @@ jobs:
         if: needs.build-push.result == 'success' && needs.deploy.result == 'success'
         uses: easychen/github-action-server-chan@v1.0.0
         with:
-          sendkey: ${{ secrets.sendkey }}
+          sendkey: ${{ secrets.SENDKEY }}
           title: "🟢 ${{ github.event.repository.name }} 部署成功"
           desp: |
             部署状态：成功
@@ -107,7 +107,7 @@ jobs:
         if: needs.build-push.result != 'success' || needs.deploy.result != 'success'
         uses: easychen/github-action-server-chan@v1.0.0
         with:
-          sendkey: ${{ secrets.sendkey }}
+          sendkey: ${{ secrets.SENDKEY }}
           title: "🔴 ${{ github.event.repository.name }} 部署失败"
           desp: |
             部署状态：失败
