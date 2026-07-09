@@ -3,7 +3,7 @@ name: 程序部署
 on:
   push:
     branches:
-      - master
+      - main
 
 env:
   IMAGE_NAME: registry.cn-beijing.aliyuncs.com/xxdl_work/${{ github.event.repository.name }}:latest
