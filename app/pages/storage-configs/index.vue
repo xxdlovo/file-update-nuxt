@@ -501,7 +501,7 @@ async function verifyConfig() {
               v-model="form.cdnAuthToken"
               class="w-full"
               type="password"
-              placeholder="yvAAxOQXup34nX"
+              placeholder="xxxxxxxxxxxx"
             />
           </UFormField>
 

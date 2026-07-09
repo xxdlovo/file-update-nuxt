@@ -90,6 +90,7 @@ jobs:
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
               -p ${{ vars.EXT_PORT }}:3000 \
+              -e TZ=Asia/Shanghai \
               -v /opt/docker/${{ env.CONTAINER_NAME }}/data:/app/data \
               -e NUXT_SESSION_PASSWORD="${{ secrets.NUXT_SESSION_PASSWORD }}" \
               -e DOWNLOAD_URL_EXPIRES_SECONDS="${{ vars.DOWNLOAD_URL_EXPIRES_SECONDS }}" \

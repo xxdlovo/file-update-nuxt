@@ -14,9 +14,11 @@ type AuditLogItem = {
   } | null
 }
 
+const ALL_FILTER_VALUE = '__all__'
+
 const actionItems = [{
   label: '全部动作',
-  value: ''
+  value: ALL_FILTER_VALUE
 }, {
   label: '登录',
   value: 'login'
@@ -39,7 +41,7 @@ const actionItems = [{
 
 const resourceTypeItems = [{
   label: '全部资源',
-  value: ''
+  value: ALL_FILTER_VALUE
 }, {
   label: '用户',
   value: 'user'
@@ -75,8 +77,8 @@ const pageSizeItems = [{
 }]
 
 const search = ref('')
-const actionGroup = ref('')
-const resourceType = ref('')
+const actionGroup = ref(ALL_FILTER_VALUE)
+const resourceType = ref(ALL_FILTER_VALUE)
 const page = ref(1)
 const pageSize = ref(20)
 const detailOpen = ref(false)
@@ -92,11 +94,11 @@ const requestPath = computed(() => {
 
   if (actionGroup.value === 'login') {
     params.set('action', 'login')
-  } else if (actionGroup.value) {
+  } else if (actionGroup.value !== ALL_FILTER_VALUE) {
     params.set('actionPrefix', actionGroup.value)
   }
 
-  if (resourceType.value) {
+  if (resourceType.value !== ALL_FILTER_VALUE) {
     params.set('resourceType', resourceType.value)
   }
 
@@ -118,7 +120,11 @@ const { data, status, refresh } = useLazyFetch<{
 const logs = computed(() => data.value?.items || [])
 const total = computed(() => data.value?.total || 0)
 const loading = computed(() => status.value === 'pending' || status.value === 'idle')
-const hasFilters = computed(() => Boolean(search.value.trim() || actionGroup.value || resourceType.value))
+const hasFilters = computed(() => Boolean(
+  search.value.trim()
+  || actionGroup.value !== ALL_FILTER_VALUE
+  || resourceType.value !== ALL_FILTER_VALUE
+))
 
 watch([search, actionGroup, resourceType, pageSize], () => {
   page.value = 1
@@ -126,13 +132,32 @@ watch([search, actionGroup, resourceType, pageSize], () => {
 
 function resetFilters() {
   search.value = ''
-  actionGroup.value = ''
-  resourceType.value = ''
+  actionGroup.value = ALL_FILTER_VALUE
+  resourceType.value = ALL_FILTER_VALUE
   page.value = 1
 }
 
+function parseServerTime(value: string) {
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T')
+
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) {
+    return new Date(normalized)
+  }
+
+  return new Date(`${normalized}Z`)
+}
+
 function formatTime(value: string) {
-  return new Date(value).toLocaleString()
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(parseServerTime(value))
 }
 
 function userLabel(log: AuditLogItem) {

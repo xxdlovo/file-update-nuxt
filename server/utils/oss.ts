@@ -462,7 +462,8 @@ async function deleteUpyunObject(objectKey: string, oss: OssConfig) {
     createUpyunV2HeaderDeleteRequest(objectKey, oss, 'path'),
     createUpyunV4QueryDeleteRequest(objectKey, oss, 'virtual'),
     createUpyunV4HeaderDeleteRequest(objectKey, oss, 'virtual'),
-    createUpyunV2HeaderDeleteRequest(objectKey, oss, 'virtual')
+    createUpyunV2HeaderDeleteRequest(objectKey, oss, 'virtual'),
+    ...createUpyunRestDeleteRequests(objectKey, oss)
   ]
   const errors: string[] = []
 
@@ -487,6 +488,27 @@ async function deleteUpyunObject(objectKey: string, oss: OssConfig) {
     status: 503,
     statusText: 'UPYUN delete failed'
   })
+}
+
+function createUpyunRestDeleteRequests(objectKey: string, oss: OssConfig) {
+  const method = 'DELETE'
+  const date = new Date().toUTCString()
+  const uri = `/${oss.bucket}/${encodeObjectPath(objectKey)}`
+  const url = `https://v0.api.upyun.com${uri}`
+  const passwordMd5 = createHash('md5').update(oss.accessKeySecret).digest('hex')
+  const signatures = [
+    createHash('md5').update([method, uri, date, '0', passwordMd5].join('&')).digest('hex'),
+    createHash('md5').update([method, uri, date, '', passwordMd5].join('&')).digest('hex')
+  ]
+
+  return signatures.map((signature, index) => ({
+    name: `rest-v0-${index + 1}`,
+    url,
+    headers: {
+      Authorization: `UpYun ${oss.accessKeyId}:${signature}`,
+      Date: date
+    }
+  }))
 }
 
 function createUpyunV4QueryDeleteRequest(objectKey: string, oss: OssConfig, style: 'path' | 'virtual') {
