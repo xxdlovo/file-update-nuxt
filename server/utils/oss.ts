@@ -104,20 +104,10 @@ export function storageProviderLabel(provider?: string | null) {
 }
 
 export function requireOssConfig(): OssConfig {
-  const config = useRuntimeConfig()
-  const oss = {
-    ...config.oss,
-    provider: 'aliyun_oss'
-  }
-
-  if (!oss.region || !oss.accessKeyId || !oss.accessKeySecret || !oss.bucket) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Object storage is not configured'
-    })
-  }
-
-  return oss
+  throw createError({
+    statusCode: 500,
+    statusMessage: 'Object storage is not configured'
+  })
 }
 
 export async function getVerifiedStorageConfigs() {
@@ -172,11 +162,10 @@ export function sanitizeFileName(fileName: string) {
 }
 
 export function createUpdateObjectKey(target: UploadTarget, oss?: Pick<OssConfig, 'uploadDir'>) {
-  const config = useRuntimeConfig()
   const safeFileName = sanitizeFileName(target.fileName)
 
   return [
-    oss?.uploadDir || config.oss.uploadDir || 'electron-updates',
+    oss?.uploadDir || 'electron-updates',
     target.appSlug,
     target.version,
     target.platform,
@@ -187,11 +176,10 @@ export function createUpdateObjectKey(target: UploadTarget, oss?: Pick<OssConfig
 }
 
 export function createFileReleaseObjectKey(target: FileReleaseUploadTarget, oss?: Pick<OssConfig, 'fileReleaseDir'>) {
-  const config = useRuntimeConfig()
   const safeFileName = sanitizeFileName(target.fileName)
 
   return [
-    oss?.fileReleaseDir || config.oss.fileReleaseDir || 'files',
+    oss?.fileReleaseDir || 'files',
     target.fileSlug,
     target.channel,
     target.environment,
