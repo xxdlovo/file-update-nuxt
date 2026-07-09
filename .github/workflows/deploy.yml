@@ -10,9 +10,27 @@ env:
   CONTAINER_NAME: ${{ github.event.repository.name }}
 
 jobs:
+  deploy-gate:
+    name: 判断是否需要部署
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check commit message
+        id: check
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if [[ "$COMMIT_MESSAGE" == *"部署"* ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-push:
     name: 构建并推送镜像
-    if: contains(github.event.head_commit.message, '部署')
+    needs: deploy-gate
+    if: needs.deploy-gate.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     environment: prod
     steps:
@@ -41,8 +59,10 @@ jobs:
 
   deploy:
     name: 部署到服务器
-    if: contains(github.event.head_commit.message, '部署')
-    needs: build-push
+    needs:
+      - deploy-gate
+      - build-push
+    if: needs.deploy-gate.outputs.enabled == 'true' && needs.build-push.result == 'success'
     runs-on: ubuntu-latest
     environment: prod
     steps:
@@ -81,40 +101,70 @@ jobs:
 
   notify:
     name: 发送部署通知
-    if: always() && contains(github.event.head_commit.message, '部署')
+    if: always() && (needs.deploy-gate.outputs.enabled == 'true' || contains(github.event.head_commit.message, '部署'))
     needs:
+      - deploy-gate
       - build-push
       - deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Notify success
-        if: needs.build-push.result == 'success' && needs.deploy.result == 'success'
-        uses: easychen/github-action-server-chan@v1.0.0
-        with:
-          sendkey: ${{ secrets.SENDKEY }}
-          title: "🟢 ${{ github.event.repository.name }} 部署成功"
-          desp: |
-            部署状态：成功
-            构建结果：${{ needs.build-push.result }}
-            部署结果：${{ needs.deploy.result }}
-            分支：${{ github.ref_name }}
-            提交：${{ github.sha }}
-            提交信息：${{ github.event.head_commit.message }}
-            触发人：${{ github.actor }}
-            查看详情：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - name: Build notification content
+        id: message
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          build_result="${{ needs.build-push.result }}"
+          deploy_result="${{ needs.deploy.result }}"
 
-      - name: Notify failure
-        if: needs.build-push.result != 'success' || needs.deploy.result != 'success'
+          label_result() {
+            case "$1" in
+              success) echo "成功" ;;
+              failure) echo "失败" ;;
+              cancelled) echo "已取消" ;;
+              skipped) echo "未执行" ;;
+              *) echo "$1" ;;
+            esac
+          }
+
+          build_label="$(label_result "$build_result")"
+          deploy_label="$(label_result "$deploy_result")"
+
+          if [ "$build_result" = "success" ] && [ "$deploy_result" = "success" ]; then
+            title="🟢 ${{ github.event.repository.name }} 部署成功"
+            status="成功"
+            reason="镜像构建和服务器部署均已完成。"
+          elif [ "$build_result" = "cancelled" ] || [ "$deploy_result" = "cancelled" ]; then
+            title="🟡 ${{ github.event.repository.name }} 部署已取消"
+            status="已取消"
+            reason="工作流被取消，未完成部署。"
+          elif [ "$build_result" != "success" ]; then
+            title="🔴 ${{ github.event.repository.name }} 部署失败"
+            status="失败"
+            reason="镜像构建未成功，服务器部署未执行。"
+          else
+            title="🔴 ${{ github.event.repository.name }} 部署失败"
+            status="失败"
+            reason="镜像构建成功，但服务器部署未成功。"
+          fi
+
+          {
+            echo "title=$title"
+            echo "desp<<EOF"
+            echo "部署状态：$status"
+            echo "状态说明：$reason"
+            echo "构建结果：$build_label ($build_result)"
+            echo "部署结果：$deploy_label ($deploy_result)"
+            echo "分支：${{ github.ref_name }}"
+            echo "提交：${{ github.sha }}"
+            echo "提交信息：$COMMIT_MESSAGE"
+            echo "触发人：${{ github.actor }}"
+            echo "查看详情：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send notification
         uses: easychen/github-action-server-chan@v1.0.0
         with:
           sendkey: ${{ secrets.SENDKEY }}
-          title: "🔴 ${{ github.event.repository.name }} 部署失败"
-          desp: |
-            部署状态：失败
-            构建结果：${{ needs.build-push.result }}
-            部署结果：${{ needs.deploy.result }}
-            分支：${{ github.ref_name }}
-            提交：${{ github.sha }}
-            提交信息：${{ github.event.head_commit.message }}
-            触发人：${{ github.actor }}
-            查看详情：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          title: ${{ steps.message.outputs.title }}
+          desp: ${{ steps.message.outputs.desp }}

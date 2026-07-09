@@ -159,6 +159,7 @@ docker run -d \
 - 数据库地址：`file:/app/data/app.db`
 - 数据持久化目录：`/app/data`
 - 启动时自动执行数据库迁移：`RUN_DB_MIGRATIONS=true`
+- Node 服务由 `pm2-runtime` 启动和托管
 
 如果你想手动管理数据库迁移，可以在运行容器时设置：
 
@@ -372,6 +373,7 @@ Container defaults:
 - Database URL: `file:/app/data/app.db`
 - Persistent data directory: `/app/data`
 - Run database migrations on startup: `RUN_DB_MIGRATIONS=true`
+- The Node server is started and managed by `pm2-runtime`
 
 If you want to manage database migrations manually, set:
 
