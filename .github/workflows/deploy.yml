@@ -12,7 +12,7 @@ env:
 jobs:
   deploy-gate:
     name: 判断是否需要部署
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
     steps:
@@ -31,7 +31,7 @@ jobs:
     name: 构建并推送镜像
     needs: deploy-gate
     if: needs.deploy-gate.outputs.enabled == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,7 +62,7 @@ jobs:
       - deploy-gate
       - build-push
     if: needs.deploy-gate.outputs.enabled == 'true' && needs.build-push.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Deploy by SSH
         uses: appleboy/ssh-action@v1.2.2
@@ -106,7 +106,7 @@ jobs:
       - deploy-gate
       - build-push
       - deploy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Build notification content
         id: message
