@@ -32,7 +32,6 @@ jobs:
     needs: deploy-gate
     if: needs.deploy-gate.outputs.enabled == 'true'
     runs-on: ubuntu-latest
-    environment: prod
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,7 +63,6 @@ jobs:
       - build-push
     if: needs.deploy-gate.outputs.enabled == 'true' && needs.build-push.result == 'success'
     runs-on: ubuntu-latest
-    environment: prod
     steps:
       - name: Deploy by SSH
         uses: appleboy/ssh-action@v1.2.2
