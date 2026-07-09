@@ -5,6 +5,18 @@ export function hashCiApiToken(token: string) {
   return createHash('sha256').update(token).digest('hex')
 }
 
+function firstConfiguredValue(...values: Array<unknown>) {
+  for (const value of values) {
+    const text = String(value || '').trim()
+
+    if (text) {
+      return text
+    }
+  }
+
+  return ''
+}
+
 export async function requireCiApiToken(event: H3Event) {
   const config = useRuntimeConfig()
   const header = getHeader(event, 'authorization') || ''
@@ -17,8 +29,16 @@ export async function requireCiApiToken(event: H3Event) {
     })
   }
 
-  const expectedHash = String(config.ciApiTokenHash || '').trim()
-  const expectedRaw = String(config.ciApiToken || '').trim()
+  const expectedHash = firstConfiguredValue(
+    config.ciApiTokenHash,
+    process.env.NUXT_CI_API_TOKEN_HASH,
+    process.env.CI_API_TOKEN_SHA256
+  )
+  const expectedRaw = firstConfiguredValue(
+    config.ciApiToken,
+    process.env.NUXT_CI_API_TOKEN,
+    process.env.CI_API_TOKEN
+  )
   const actualHash = hashCiApiToken(token)
   const allowedHash = expectedHash || (expectedRaw ? hashCiApiToken(expectedRaw) : '')
 

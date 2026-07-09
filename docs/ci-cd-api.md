@@ -9,6 +9,7 @@
 - Token 配置：
   - 推荐生产环境配置 `CI_API_TOKEN_SHA256`，值为 Token 的 SHA-256 hex 摘要
   - 本地开发可以配置 `CI_API_TOKEN`
+  - Nuxt 运行时环境也支持 `NUXT_CI_API_TOKEN_HASH` 和 `NUXT_CI_API_TOKEN`
 - Content-Type：业务接口使用 `application/json`
 
 示例请求头：
