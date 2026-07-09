@@ -85,7 +85,7 @@ Content-Type: application/json
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `version` | string | 是 | 版本号 |
+| `version` | string | 否 | 版本号；不传时自动取当前应用同通道最新版本并 patch +1，没有版本时从 `0.0.1` 开始 |
 | `buildNumber` | string | 否 | 构建号 |
 | `channel` | string | 否 | 发布通道；不传时使用应用默认通道 |
 | `forceUpdate` | boolean | 否 | 是否强制更新 |
@@ -320,7 +320,7 @@ Content-Type: application/json
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `version` | string | 是 | 版本号 |
+| `version` | string | 否 | 版本号；不传时自动取当前项目同通道、同环境最新版本并 patch +1，没有版本时从 `0.0.1` 开始 |
 | `channel` | string | 否 | 发布通道；不传时使用项目默认通道 |
 | `environment` | string | 否 | 环境；默认 `prod` |
 | `releaseNotes` | string | 否 | 发布说明 |
@@ -595,6 +595,7 @@ curl -X POST "https://你的域名/api/ci/files/resource-pack/releases/complete"
 ## 注意事项
 
 - `prepare` 会创建或复用草稿版本；同一个 slug、版本号、通道会命中同一版本记录。
+- `prepare` 的 `version` 可以省略：Electron 应用按应用 + 通道自动递增，普通文件按项目 + 通道 + 环境自动递增；没有历史版本时使用 `0.0.1`。
 - Electron 应用可以在一次 `prepare` 和 `complete` 中处理多个平台产物。
 - 普通文件一次版本只登记一个文件。
 - `complete` 中的 `objectKey` 应使用 `prepare` 响应里的值，避免登记到错误对象。

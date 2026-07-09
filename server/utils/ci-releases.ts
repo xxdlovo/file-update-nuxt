@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { appVersions, apps, fileProjects, fileVersions, updateFiles } from '../../db/schema'
 
 type CiElectronFileInput = {
@@ -82,6 +82,46 @@ function assertVersion(value?: string) {
   return version
 }
 
+function incrementPatchVersion(version: string) {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version.trim())
+
+  if (!match) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Version must use semantic format like 1.2.0'
+    })
+  }
+
+  return `${Number(match[1])}.${Number(match[2])}.${Number(match[3]) + 1}`
+}
+
+async function resolveNextAppVersion(appId: number, channel: string) {
+  const db = useDb()
+  const latest = await db.query.appVersions.findFirst({
+    where: and(
+      eq(appVersions.appId, appId),
+      eq(appVersions.channel, channel)
+    ),
+    orderBy: [desc(appVersions.versionNormalized)]
+  })
+
+  return latest ? incrementPatchVersion(latest.version) : '0.0.1'
+}
+
+async function resolveNextFileVersion(fileProjectId: number, channel: string, environment: string) {
+  const db = useDb()
+  const latest = await db.query.fileVersions.findFirst({
+    where: and(
+      eq(fileVersions.fileProjectId, fileProjectId),
+      eq(fileVersions.channel, channel),
+      eq(fileVersions.environment, environment)
+    ),
+    orderBy: [desc(fileVersions.versionNormalized)]
+  })
+
+  return latest ? incrementPatchVersion(latest.version) : '0.0.1'
+}
+
 function assertFileName(value?: string) {
   const fileName = value?.trim()
 
@@ -126,8 +166,10 @@ export async function prepareCiElectronRelease(event: Parameters<typeof writeAud
   await requireCiApiToken(event)
 
   const app = await getCiAppBySlug(appSlug)
-  const version = assertVersion(body.version)
   const channel = body.channel?.trim() || app.defaultChannel
+  const version = body.version?.trim()
+    ? assertVersion(body.version)
+    : await resolveNextAppVersion(app.id, channel)
   const files = body.files || []
 
   if (files.length === 0) {
@@ -349,9 +391,11 @@ export async function prepareCiFileRelease(event: Parameters<typeof writeAuditLo
   await requireCiApiToken(event)
 
   const project = await getCiFileProjectBySlug(fileSlug)
-  const version = assertVersion(body.version)
   const channel = body.channel?.trim() || project.defaultChannel
   const environment = body.environment?.trim() || 'prod'
+  const version = body.version?.trim()
+    ? assertVersion(body.version)
+    : await resolveNextFileVersion(project.id, channel, environment)
   const visibility = body.visibility?.trim() || 'signed'
   const fileName = assertFileName(body.fileName)
 
