@@ -306,11 +306,7 @@ async function verifyConfig() {
           </p>
         </div>
 
-        <UButton
-          icon="i-lucide-plus"
-          label="新增配置"
-          @click="openCreateModal"
-        />
+        <UButton icon="i-lucide-plus" label="新增配置" @click="openCreateModal" />
       </div>
     </section>
 
@@ -346,11 +342,7 @@ async function verifyConfig() {
                   暂无存储配置
                 </td>
               </tr>
-              <tr
-                v-for="config in configs"
-                :key="config.id"
-                class="border-b border-muted last:border-b-0"
-              >
+              <tr v-for="config in configs" :key="config.id" class="border-b border-muted last:border-b-0">
                 <td class="px-4 py-3">
                   <p class="font-medium">
                     {{ config.name }}
@@ -373,22 +365,11 @@ async function verifyConfig() {
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex flex-wrap items-center gap-2">
-                    <UBadge
-                      :color="statusColor(config)"
-                      variant="subtle"
-                      :label="statusLabel(config)"
-                    />
-                    <UBadge
-                      :color="config.enabled ? 'success' : 'neutral'"
-                      variant="subtle"
-                      :label="config.enabled ? '启用' : '停用'"
-                    />
-                    <UBadge
-                      v-if="config.provider === 'upyun_uss' && config.cdnAuthTokenConfigured"
-                      color="primary"
-                      variant="subtle"
-                      label="CDN Token"
-                    />
+                    <UBadge :color="statusColor(config)" variant="subtle" :label="statusLabel(config)" />
+                    <UBadge :color="config.enabled ? 'success' : 'neutral'" variant="subtle"
+                      :label="config.enabled ? '启用' : '停用'" />
+                    <UBadge v-if="config.provider === 'upyun_uss' && config.cdnAuthTokenConfigured" color="primary"
+                      variant="subtle" label="CDN Token" />
                   </div>
                 </td>
                 <td class="px-4 py-3">
@@ -399,21 +380,10 @@ async function verifyConfig() {
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex justify-end gap-1">
-                    <UButton
-                      color="neutral"
-                      variant="ghost"
-                      icon="i-lucide-pencil"
-                      aria-label="编辑配置"
-                      @click="openEditModal(config)"
-                    />
-                    <UButton
-                      color="neutral"
-                      variant="ghost"
-                      icon="i-lucide-shield-check"
-                      aria-label="验证配置"
-                      :loading="verifyingId === config.id"
-                      @click="openVerifyConfirm(config)"
-                    />
+                    <UButton color="neutral" variant="ghost" icon="i-lucide-pencil" aria-label="编辑配置"
+                      @click="openEditModal(config)" />
+                    <UButton color="neutral" variant="ghost" icon="i-lucide-shield-check" aria-label="验证配置"
+                      :loading="verifyingId === config.id" @click="openVerifyConfirm(config)" />
                   </div>
                 </td>
               </tr>
@@ -423,21 +393,12 @@ async function verifyConfig() {
       </UCard>
     </section>
 
-    <UModal
-      v-model:open="createOpen"
-      :title="editingConfig ? '编辑对象存储' : '新增对象存储'"
+    <UModal v-model:open="createOpen" :title="editingConfig ? '编辑对象存储' : '新增对象存储'"
       :description="editingConfig ? '修改后需要重新验证，验证成功的配置才能用于上传。' : '保存后请执行验证，验证成功的配置才能用于上传。'"
-      :ui="{ footer: 'justify-end' }"
-    >
+      :ui="{ footer: 'justify-end' }">
       <template #body>
         <form id="create-storage-config-form" class="grid gap-4" @submit.prevent="submitConfig">
-          <UAlert
-            v-if="errorMessage"
-            color="error"
-            variant="soft"
-            icon="i-lucide-circle-alert"
-            :title="errorMessage"
-          />
+          <UAlert v-if="errorMessage" color="error" variant="soft" icon="i-lucide-circle-alert" :title="errorMessage" />
 
           <UFormField label="Provider" name="provider" required>
             <USelect v-model="form.provider" class="w-full" :items="providerItems" value-key="value" />
@@ -457,12 +418,8 @@ async function verifyConfig() {
             </UFormField>
 
             <UFormField label="Access Key Secret" name="accessKeySecret" :required="!editingConfig">
-              <UInput
-                v-model="form.accessKeySecret"
-                class="w-full"
-                type="password"
-                :placeholder="editingConfig ? '留空则保持不变' : ''"
-              />
+              <UInput v-model="form.accessKeySecret" class="w-full" type="password"
+                :placeholder="editingConfig ? '留空则保持不变' : ''" />
             </UFormField>
 
             <UFormField label="Bucket" name="bucket" required>
@@ -470,12 +427,8 @@ async function verifyConfig() {
             </UFormField>
 
             <UFormField label="Endpoint" name="endpoint" hint="可选">
-              <UInput
-                v-model="form.endpoint"
-                class="w-full"
-                :disabled="form.provider === 'upyun_uss'"
-                :placeholder="endpointPlaceholder"
-              />
+              <UInput v-model="form.endpoint" class="w-full" :disabled="form.provider === 'upyun_uss'"
+                :placeholder="endpointPlaceholder" />
             </UFormField>
 
             <UFormField label="Electron 前缀" name="uploadDir" required>
@@ -491,18 +444,9 @@ async function verifyConfig() {
             <UInput v-model="form.publicBaseUrl" class="w-full" placeholder="https://cdn.example.com" />
           </UFormField>
 
-          <UFormField
-            v-if="form.provider === 'upyun_uss'"
-            label="CDN Token 防盗链密钥"
-            name="cdnAuthToken"
-            :hint="editingConfig ? '留空则保持不变' : '用于生成 _upt 参数'"
-          >
-            <UInput
-              v-model="form.cdnAuthToken"
-              class="w-full"
-              type="password"
-              placeholder="xxxxxxxxxxxx"
-            />
+          <UFormField v-if="form.provider === 'upyun_uss'" label="CDN Token 防盗链密钥" name="cdnAuthToken"
+            :hint="editingConfig ? '留空则保持不变' : '用于生成 _upt 参数'">
+            <UInput v-model="form.cdnAuthToken" class="w-full" type="password" placeholder="xxxxxxxxxxxx" />
           </UFormField>
 
           <USwitch v-model="form.enabled" label="启用配置" />
@@ -510,54 +454,22 @@ async function verifyConfig() {
       </template>
 
       <template #footer="{ close }">
-        <UButton
-          color="neutral"
-          variant="outline"
-          label="取消"
-          :disabled="creating"
-          @click="close"
-        />
-        <UButton
-          type="submit"
-          form="create-storage-config-form"
-          icon="i-lucide-save"
-          label="保存"
-          :loading="creating"
-        />
+        <UButton color="neutral" variant="outline" label="取消" :disabled="creating" @click="close" />
+        <UButton type="submit" form="create-storage-config-form" icon="i-lucide-save" label="保存" :loading="creating" />
       </template>
     </UModal>
 
-    <UModal
-      v-model:open="verifyConfirmOpen"
-      title="验证存储配置"
-      description="系统会上传一个很小的临时测试对象，确认写入成功后立即删除。"
-      :ui="{ footer: 'justify-end' }"
-    >
+    <UModal v-model:open="verifyConfirmOpen" title="验证存储配置" description="系统会上传一个很小的临时测试对象，确认写入成功后立即删除。"
+      :ui="{ footer: 'justify-end' }">
       <template #body>
-        <UAlert
-          color="warning"
-          variant="soft"
-          icon="i-lucide-triangle-alert"
-          title="验证会执行真实的上传和删除操作"
-          :description="`目标：${pendingVerifyConfig ? providerLabel(pendingVerifyConfig.provider) : '-'} / ${pendingVerifyConfig?.bucket || '-'}`"
-        />
+        <UAlert color="warning" variant="soft" icon="i-lucide-triangle-alert" title="验证会执行真实的上传和删除操作"
+          :description="`目标：${pendingVerifyConfig ? providerLabel(pendingVerifyConfig.provider) : '-'} / ${pendingVerifyConfig?.bucket || '-'}`" />
       </template>
 
       <template #footer="{ close }">
-        <UButton
-          color="neutral"
-          variant="outline"
-          label="取消"
-          :disabled="verifyingId !== null"
-          @click="close"
-        />
-        <UButton
-          color="warning"
-          icon="i-lucide-shield-check"
-          label="开始验证"
-          :loading="verifyingId === pendingVerifyConfig?.id"
-          @click="verifyConfig"
-        />
+        <UButton color="neutral" variant="outline" label="取消" :disabled="verifyingId !== null" @click="close" />
+        <UButton color="warning" icon="i-lucide-shield-check" label="开始验证"
+          :loading="verifyingId === pendingVerifyConfig?.id" @click="verifyConfig" />
       </template>
     </UModal>
   </main>
