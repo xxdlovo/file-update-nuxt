@@ -76,6 +76,7 @@ jobs:
             set -e
 
             sudo mkdir -p /opt/docker/${{ env.CONTAINER_NAME }}/data
+            sudo chown -R 1001:1001 /opt/docker/${{ env.CONTAINER_NAME }}/data
 
             echo "${{ secrets.ALIYUN_PASSWORD }}" | sudo docker login registry.cn-beijing.aliyuncs.com \
               -u "${{ secrets.ALIYUN_USERNAME }}" \
