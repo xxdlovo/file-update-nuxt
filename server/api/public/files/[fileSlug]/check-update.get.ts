@@ -21,6 +21,16 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!release) {
+    await recordFileUpdateCheck({
+      projectId: project.id,
+      channel,
+      environment,
+      currentVersion,
+      updateAvailable: false,
+      event,
+      tokenProvided: Boolean(token)
+    })
+
     return {
       updateAvailable: false,
       reason: 'No active release'
@@ -32,6 +42,17 @@ export default defineEventHandler(async (event) => {
   const downloadUrl = updateAvailable
     ? await createSignedDownloadUrl(release.version.objectKey, release.version.storageConfigId)
     : ''
+
+  await recordFileUpdateCheck({
+    projectId: project.id,
+    versionId: release.version.id,
+    channel,
+    environment,
+    currentVersion,
+    updateAvailable,
+    event,
+    tokenProvided: Boolean(token)
+  })
 
   return {
     updateAvailable,

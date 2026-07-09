@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { fileProjects, fileReleases, fileVersions } from '../../db/schema'
+import type { H3Event } from 'h3'
+import { fileDownloadEvents, fileProjects, fileReleases, fileUpdateCheckEvents, fileVersions } from '../../db/schema'
 
 type FileVersionWithProject = Awaited<ReturnType<typeof getFileVersionById>>
 
@@ -127,13 +128,64 @@ export function serializePublicFileVersion(version: typeof fileVersions.$inferSe
   }
 }
 
-export async function recordFileVersionDownload(versionId: number) {
+export async function recordFileVersionDownload(input: {
+  version: typeof fileVersions.$inferSelect
+  event: H3Event
+  source?: 'api' | 'share'
+  tokenProvided?: boolean
+}) {
   const db = useDb()
+  const now = new Date().toISOString()
+  const request = requestAnalytics(input.event)
 
   await db.update(fileVersions)
     .set({
       downloadCount: sql`${fileVersions.downloadCount} + 1`,
-      updatedAt: new Date().toISOString()
+      updatedAt: now
     })
-    .where(eq(fileVersions.id, versionId))
+    .where(eq(fileVersions.id, input.version.id))
+
+  await db.insert(fileDownloadEvents).values({
+    fileProjectId: input.version.fileProjectId,
+    fileVersionId: input.version.id,
+    channel: input.version.channel,
+    environment: input.version.environment,
+    source: input.source || 'api',
+    fileName: input.version.fileName,
+    userAgent: request.userAgent,
+    referer: request.referer,
+    ipHash: request.ipHash,
+    tokenProvided: Boolean(input.tokenProvided),
+    createdAt: now
+  })
+}
+
+export async function recordFileUpdateCheck(input: {
+  projectId: number
+  versionId?: number | null
+  channel: string
+  environment: string
+  currentVersion?: string
+  updateAvailable: boolean
+  event: H3Event
+  source?: 'api'
+  tokenProvided?: boolean
+}) {
+  const db = useDb()
+  const request = requestAnalytics(input.event)
+
+  await db.insert(fileUpdateCheckEvents).values({
+    fileProjectId: input.projectId,
+    fileVersionId: input.versionId || null,
+    channel: input.channel,
+    environment: input.environment,
+    currentVersion: input.currentVersion || null,
+    updateAvailable: input.updateAvailable,
+    source: input.source || 'api',
+    userAgent: request.userAgent,
+    referer: request.referer,
+    ipHash: request.ipHash,
+    tokenProvided: Boolean(input.tokenProvided),
+    createdAt: new Date().toISOString()
+  })
 }

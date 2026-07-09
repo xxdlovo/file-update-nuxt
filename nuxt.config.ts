@@ -15,6 +15,10 @@ export default defineNuxtConfig({
   ignore: sqliteWatchIgnored,
   devtools: { enabled: false },
   ssr: true,
+     devServer: {
+        host: '0.0.0.0',
+        port: 3000
+    },
   ui: {
     fonts: false
   },

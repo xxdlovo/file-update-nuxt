@@ -29,6 +29,20 @@
       "when": 1783519744419,
       "tag": "0003_fine_steve_rogers",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1783557651424,
+      "tag": "0004_round_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1783558673752,
+      "tag": "0005_sour_meteorite",
+      "breakpoints": true
     }
   ]
 }

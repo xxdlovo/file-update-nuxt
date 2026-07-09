@@ -178,6 +178,67 @@ export const fileReleases = sqliteTable('file_releases', {
   index('file_releases_lookup_idx').on(table.fileProjectId, table.channel, table.environment, table.active)
 ])
 
+export const fileDownloadEvents = sqliteTable('file_download_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  fileProjectId: integer('file_project_id').notNull().references(() => fileProjects.id, { onDelete: 'cascade' }),
+  fileVersionId: integer('file_version_id').notNull().references(() => fileVersions.id, { onDelete: 'cascade' }),
+  channel: text('channel').notNull(),
+  environment: text('environment').notNull(),
+  source: text('source').notNull().default('api'),
+  fileName: text('file_name').notNull(),
+  userAgent: text('user_agent'),
+  referer: text('referer'),
+  ipHash: text('ip_hash'),
+  tokenProvided: integer('token_provided', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`)
+}, table => [
+  index('file_download_events_project_created_idx').on(table.fileProjectId, table.createdAt),
+  index('file_download_events_version_created_idx').on(table.fileVersionId, table.createdAt),
+  index('file_download_events_source_idx').on(table.source)
+])
+
+export const fileUpdateCheckEvents = sqliteTable('file_update_check_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  fileProjectId: integer('file_project_id').notNull().references(() => fileProjects.id, { onDelete: 'cascade' }),
+  fileVersionId: integer('file_version_id').references(() => fileVersions.id, { onDelete: 'set null' }),
+  channel: text('channel').notNull(),
+  environment: text('environment').notNull(),
+  currentVersion: text('current_version'),
+  updateAvailable: integer('update_available', { mode: 'boolean' }).notNull().default(false),
+  source: text('source').notNull().default('api'),
+  userAgent: text('user_agent'),
+  referer: text('referer'),
+  ipHash: text('ip_hash'),
+  tokenProvided: integer('token_provided', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`)
+}, table => [
+  index('file_update_check_events_project_created_idx').on(table.fileProjectId, table.createdAt),
+  index('file_update_check_events_version_created_idx').on(table.fileVersionId, table.createdAt),
+  index('file_update_check_events_source_idx').on(table.source)
+])
+
+export const appUpdateCheckEvents = sqliteTable('app_update_check_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  appId: integer('app_id').notNull().references(() => apps.id, { onDelete: 'cascade' }),
+  appVersionId: integer('app_version_id').references(() => appVersions.id, { onDelete: 'set null' }),
+  channel: text('channel').notNull(),
+  platform: text('platform').notNull(),
+  arch: text('arch').notNull(),
+  currentVersion: text('current_version'),
+  updateAvailable: integer('update_available', { mode: 'boolean' }).notNull().default(false),
+  filesIssued: integer('files_issued').notNull().default(0),
+  source: text('source').notNull().default('api'),
+  userAgent: text('user_agent'),
+  referer: text('referer'),
+  ipHash: text('ip_hash'),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`)
+}, table => [
+  index('app_update_check_events_app_created_idx').on(table.appId, table.createdAt),
+  index('app_update_check_events_version_created_idx').on(table.appVersionId, table.createdAt),
+  index('app_update_check_events_target_idx').on(table.appId, table.channel, table.platform, table.arch),
+  index('app_update_check_events_source_idx').on(table.source)
+])
+
 export const auditLogs = sqliteTable('audit_logs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -199,7 +260,8 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const appsRelations = relations(apps, ({ many }) => ({
   versions: many(appVersions),
   updateFiles: many(updateFiles),
-  releases: many(releases)
+  releases: many(releases),
+  updateCheckEvents: many(appUpdateCheckEvents)
 }))
 
 export const appVersionsRelations = relations(appVersions, ({ one, many }) => ({
@@ -208,7 +270,8 @@ export const appVersionsRelations = relations(appVersions, ({ one, many }) => ({
     references: [apps.id]
   }),
   files: many(updateFiles),
-  releases: many(releases)
+  releases: many(releases),
+  updateCheckEvents: many(appUpdateCheckEvents)
 }))
 
 export const updateFilesRelations = relations(updateFiles, ({ one }) => ({
@@ -244,7 +307,9 @@ export const releasesRelations = relations(releases, ({ one }) => ({
 
 export const fileProjectsRelations = relations(fileProjects, ({ many }) => ({
   versions: many(fileVersions),
-  releases: many(fileReleases)
+  releases: many(fileReleases),
+  downloadEvents: many(fileDownloadEvents),
+  updateCheckEvents: many(fileUpdateCheckEvents)
 }))
 
 export const fileVersionsRelations = relations(fileVersions, ({ one, many }) => ({
@@ -260,7 +325,9 @@ export const fileVersionsRelations = relations(fileVersions, ({ one, many }) => 
     fields: [fileVersions.storageConfigId],
     references: [storageConfigs.id]
   }),
-  releases: many(fileReleases)
+  releases: many(fileReleases),
+  downloadEvents: many(fileDownloadEvents),
+  updateCheckEvents: many(fileUpdateCheckEvents)
 }))
 
 export const fileReleasesRelations = relations(fileReleases, ({ one }) => ({
@@ -271,6 +338,39 @@ export const fileReleasesRelations = relations(fileReleases, ({ one }) => ({
   version: one(fileVersions, {
     fields: [fileReleases.fileVersionId],
     references: [fileVersions.id]
+  })
+}))
+
+export const fileDownloadEventsRelations = relations(fileDownloadEvents, ({ one }) => ({
+  project: one(fileProjects, {
+    fields: [fileDownloadEvents.fileProjectId],
+    references: [fileProjects.id]
+  }),
+  version: one(fileVersions, {
+    fields: [fileDownloadEvents.fileVersionId],
+    references: [fileVersions.id]
+  })
+}))
+
+export const fileUpdateCheckEventsRelations = relations(fileUpdateCheckEvents, ({ one }) => ({
+  project: one(fileProjects, {
+    fields: [fileUpdateCheckEvents.fileProjectId],
+    references: [fileProjects.id]
+  }),
+  version: one(fileVersions, {
+    fields: [fileUpdateCheckEvents.fileVersionId],
+    references: [fileVersions.id]
+  })
+}))
+
+export const appUpdateCheckEventsRelations = relations(appUpdateCheckEvents, ({ one }) => ({
+  app: one(apps, {
+    fields: [appUpdateCheckEvents.appId],
+    references: [apps.id]
+  }),
+  version: one(appVersions, {
+    fields: [appUpdateCheckEvents.appVersionId],
+    references: [appVersions.id]
   })
 }))
 

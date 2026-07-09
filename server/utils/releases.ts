@@ -1,5 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm'
-import { appVersions, apps, releases, updateFiles } from '../../db/schema'
+import type { H3Event } from 'h3'
+import { appUpdateCheckEvents, appVersions, apps, releases, updateFiles } from '../../db/schema'
 
 type PublishTarget = {
   platform: string
@@ -185,4 +186,36 @@ function uniqueTargets(files: ReleaseFile[]) {
 
 function targetKey(target: PublishTarget) {
   return `${target.platform}:${target.arch}`
+}
+
+export async function recordAppUpdateCheck(input: {
+  appId: number
+  versionId?: number | null
+  channel: string
+  platform: string
+  arch: string
+  currentVersion?: string
+  updateAvailable: boolean
+  filesIssued?: number
+  event: H3Event
+  source?: 'api' | 'electron-updater'
+}) {
+  const db = useDb()
+  const request = requestAnalytics(input.event)
+
+  await db.insert(appUpdateCheckEvents).values({
+    appId: input.appId,
+    appVersionId: input.versionId || null,
+    channel: input.channel,
+    platform: input.platform,
+    arch: input.arch,
+    currentVersion: input.currentVersion || null,
+    updateAvailable: input.updateAvailable,
+    filesIssued: input.filesIssued || 0,
+    source: input.source || 'api',
+    userAgent: request.userAgent,
+    referer: request.referer,
+    ipHash: request.ipHash,
+    createdAt: new Date().toISOString()
+  })
 }

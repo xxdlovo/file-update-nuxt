@@ -30,6 +30,17 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!release) {
+    await recordAppUpdateCheck({
+      appId: app.id,
+      channel,
+      platform,
+      arch,
+      currentVersion,
+      updateAvailable: false,
+      event,
+      source: 'api'
+    })
+
     return {
       updateAvailable: false,
       reason: 'No active release'
@@ -53,6 +64,19 @@ export default defineEventHandler(async (event) => {
         downloadUrl: await createSignedDownloadUrl(file.objectKey, file.storageConfigId)
       })))
     : []
+
+  await recordAppUpdateCheck({
+    appId: app.id,
+    versionId: release.version.id,
+    channel,
+    platform,
+    arch,
+    currentVersion,
+    updateAvailable,
+    filesIssued: files.length,
+    event,
+    source: 'api'
+  })
 
   return {
     updateAvailable,

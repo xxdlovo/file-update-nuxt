@@ -27,6 +27,48 @@ type VersionFile = {
   objectKey: string
 }
 
+type AppDownloadStats = {
+  rangeDays: number
+  summary: {
+    totalChecks: number
+    updateAvailableChecks: number
+    downloadLinksIssued: number
+    uniqueCheckers: number
+    lastSevenChecks: number
+  }
+  daily: Array<{
+    date: string
+    checks: number
+    downloadLinksIssued: number
+  }>
+  versions: Array<{
+    versionId: number | null
+    version: string
+    channel: string
+    checks: number
+    downloadLinksIssued: number
+  }>
+  sources: Array<{
+    source: string
+    checks: number
+    downloadLinksIssued: number
+  }>
+  recent: Array<{
+    id: number
+    versionId: number | null
+    version: string
+    channel: string
+    platform: string
+    arch: string
+    currentVersion: string | null
+    updateAvailable: boolean
+    filesIssued: number
+    source: string
+    referer: string | null
+    createdAt: string
+  }>
+}
+
 const route = useRoute()
 const toast = useToast()
 const requestUrl = useRequestURL()
@@ -49,6 +91,10 @@ const { data: app, refresh } = useLazyFetch<AppDetail>(() => `/api/apps/${appId.
 const { data: versionsData, refresh: refreshVersions } = useLazyFetch<{ items: AppVersion[], total: number }>(
   () => `/api/apps/${appId.value}/versions`
 )
+const { data: downloadStats, status: downloadStatsStatus, refresh: refreshDownloadStats } = useLazyFetch<AppDownloadStats>(
+  () => `/api/apps/${appId.value}/download-stats`,
+  { query: { days: 14 } }
+)
 
 const versionForm = reactive({
   version: '',
@@ -59,6 +105,8 @@ const versionForm = reactive({
 })
 
 const versions = computed(() => versionsData.value?.items || [])
+const downloadingStats = computed(() => downloadStatsStatus.value === 'pending' || downloadStatsStatus.value === 'idle')
+const maxDailyStats = computed(() => Math.max(...(downloadStats.value?.daily.map(item => Math.max(item.checks, item.downloadLinksIssued)) || [0]), 1))
 const channelItems = computed(() => {
   const channels = new Set<string>()
 
@@ -169,10 +217,33 @@ function statusColor(status: string) {
   return 'neutral'
 }
 
+function sourceLabel(source: string) {
+  return {
+    api: '检查接口',
+    'electron-updater': 'electron-updater'
+  }[source] || source
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return '-'
+  }
+
+  return new Date(value).toLocaleString()
+}
+
+function formatShortDate(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
 async function refreshPage() {
   await Promise.all([
     refresh(),
-    refreshVersions()
+    refreshVersions(),
+    refreshDownloadStats()
   ])
   toast.add({
     title: '页面已刷新',
@@ -447,6 +518,242 @@ async function copyText(value: string, label: string) {
                 </template>
               </tbody>
             </table>
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 class="text-base font-semibold">
+                  下载统计
+                </h2>
+                <p class="mt-1 text-sm text-muted">
+                  统计检查更新请求和服务端签发的更新文件下载链接。
+                </p>
+              </div>
+
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-refresh-cw"
+                label="刷新统计"
+                :loading="downloadingStats"
+                @click="refreshDownloadStats"
+              />
+            </div>
+          </template>
+
+          <div class="space-y-6">
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div class="rounded-lg border border-muted px-4 py-3">
+                <p class="text-sm text-muted">
+                  检查更新
+                </p>
+                <p class="mt-2 text-2xl font-semibold">
+                  {{ downloadStats?.summary.totalChecks || 0 }}
+                </p>
+              </div>
+              <div class="rounded-lg border border-muted px-4 py-3">
+                <p class="text-sm text-muted">
+                  近 7 天
+                </p>
+                <p class="mt-2 text-2xl font-semibold">
+                  {{ downloadStats?.summary.lastSevenChecks || 0 }}
+                </p>
+              </div>
+              <div class="rounded-lg border border-muted px-4 py-3">
+                <p class="text-sm text-muted">
+                  更新可用
+                </p>
+                <p class="mt-2 text-2xl font-semibold">
+                  {{ downloadStats?.summary.updateAvailableChecks || 0 }}
+                </p>
+              </div>
+              <div class="rounded-lg border border-muted px-4 py-3">
+                <p class="text-sm text-muted">
+                  下载链接
+                </p>
+                <p class="mt-2 text-2xl font-semibold">
+                  {{ downloadStats?.summary.downloadLinksIssued || 0 }}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-sm font-medium">
+                  近 {{ downloadStats?.rangeDays || 14 }} 天趋势
+                </h3>
+                <span class="text-xs text-muted">深色为检查，浅色为链接</span>
+              </div>
+              <div class="grid grid-cols-7 gap-2 md:grid-cols-[repeat(14,minmax(0,1fr))]">
+                <div
+                  v-for="day in downloadStats?.daily || []"
+                  :key="day.date"
+                  class="flex min-h-28 flex-col justify-end gap-2 rounded border border-muted px-2 py-2"
+                >
+                  <div class="flex h-16 items-end">
+                    <div
+                      class="w-1/2 rounded bg-primary"
+                      :style="{ height: `${Math.max((day.checks / maxDailyStats) * 100, day.checks ? 8 : 2)}%` }"
+                    />
+                    <div
+                      class="w-1/2 rounded bg-primary/35"
+                      :style="{ height: `${Math.max((day.downloadLinksIssued / maxDailyStats) * 100, day.downloadLinksIssued ? 8 : 2)}%` }"
+                    />
+                  </div>
+                  <div class="text-center">
+                    <p class="text-xs font-medium">
+                      {{ day.checks }} / {{ day.downloadLinksIssued }}
+                    </p>
+                    <p class="text-[11px] text-muted">
+                      {{ formatShortDate(day.date) }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid gap-6 xl:grid-cols-2">
+              <div>
+                <h3 class="mb-3 text-sm font-medium">
+                  版本排行
+                </h3>
+                <div class="overflow-x-auto rounded border border-muted">
+                  <table class="w-full text-left text-sm">
+                    <thead class="border-b border-muted text-muted">
+                      <tr>
+                        <th class="px-3 py-2 font-medium">
+                          版本
+                        </th>
+                        <th class="px-3 py-2 text-right font-medium">
+                          检查
+                        </th>
+                        <th class="px-3 py-2 text-right font-medium">
+                          链接
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-if="!downloadStats?.versions.length">
+                        <td class="px-3 py-6 text-center text-muted" colspan="3">
+                          暂无统计记录
+                        </td>
+                      </tr>
+                      <tr
+                        v-for="item in downloadStats?.versions || []"
+                        :key="item.versionId || item.version"
+                        class="border-b border-muted last:border-b-0"
+                      >
+                        <td class="px-3 py-2">
+                          <NuxtLink
+                            v-if="item.versionId"
+                            :to="`/versions/${item.versionId}`"
+                            class="font-medium text-highlighted"
+                          >
+                            {{ item.version }}
+                          </NuxtLink>
+                          <span v-else class="font-medium">{{ item.version }}</span>
+                          <p class="text-xs text-muted">
+                            {{ item.channel }}
+                          </p>
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                          {{ item.checks }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                          {{ item.downloadLinksIssued }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="mb-3 text-sm font-medium">
+                  来源分布
+                </h3>
+                <div class="space-y-2">
+                  <div
+                    v-for="item in downloadStats?.sources || []"
+                    :key="item.source"
+                    class="rounded border border-muted px-3 py-2"
+                  >
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                      <span>{{ sourceLabel(item.source) }}</span>
+                      <span class="font-medium">{{ item.checks }}</span>
+                    </div>
+                    <div class="mt-2 h-2 overflow-hidden rounded bg-elevated">
+                      <div
+                        class="h-full rounded bg-primary"
+                        :style="{ width: `${downloadStats?.summary.totalChecks ? (item.checks / downloadStats.summary.totalChecks) * 100 : 0}%` }"
+                      />
+                    </div>
+                  </div>
+                  <p v-if="!downloadStats?.sources.length" class="rounded border border-muted px-3 py-6 text-center text-sm text-muted">
+                    暂无来源数据
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="mb-3 text-sm font-medium">
+                最近检查
+              </h3>
+              <div class="overflow-x-auto rounded border border-muted">
+                <table class="w-full text-left text-sm">
+                  <thead class="border-b border-muted text-muted">
+                    <tr>
+                      <th class="px-3 py-2 font-medium">
+                        时间
+                      </th>
+                      <th class="px-3 py-2 font-medium">
+                        目标
+                      </th>
+                      <th class="px-3 py-2 font-medium">
+                        来源
+                      </th>
+                      <th class="px-3 py-2 text-right font-medium">
+                        链接
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="!downloadStats?.recent.length">
+                      <td class="px-3 py-6 text-center text-muted" colspan="4">
+                        暂无检查记录
+                      </td>
+                    </tr>
+                    <tr
+                      v-for="item in downloadStats?.recent || []"
+                      :key="item.id"
+                      class="border-b border-muted last:border-b-0"
+                    >
+                      <td class="whitespace-nowrap px-3 py-2">
+                        {{ formatDateTime(item.createdAt) }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <p class="font-medium">
+                          {{ item.version }}
+                        </p>
+                        <p class="text-xs text-muted">
+                          {{ item.channel }} / {{ item.platform }} / {{ item.arch }}
+                        </p>
+                      </td>
+                      <td class="px-3 py-2">
+                        <UBadge color="neutral" variant="subtle" :label="sourceLabel(item.source)" />
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        {{ item.filesIssued }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </UCard>
       </div>

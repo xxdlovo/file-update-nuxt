@@ -32,7 +32,11 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await recordFileVersionDownload(release.version.id)
+  await recordFileVersionDownload({
+    version: release.version,
+    event,
+    source: 'share'
+  })
 
   const downloadUrl = await createSignedDownloadUrl(release.version.objectKey, release.version.storageConfigId)
 

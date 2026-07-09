@@ -26,7 +26,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await recordFileVersionDownload(release.version.id)
+  await recordFileVersionDownload({
+    version: release.version,
+    event,
+    source: 'api',
+    tokenProvided: Boolean(token)
+  })
 
   return {
     downloadUrl: await createSignedDownloadUrl(release.version.objectKey, release.version.storageConfigId),

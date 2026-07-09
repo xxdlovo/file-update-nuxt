@@ -37,6 +37,18 @@ export async function buildElectronUpdaterMetadata(event: H3Event) {
     })
   }
 
+  await recordAppUpdateCheck({
+    appId: release.appId,
+    versionId: release.version.id,
+    channel,
+    platform,
+    arch,
+    updateAvailable: true,
+    filesIssued: files.length,
+    event,
+    source: 'electron-updater'
+  })
+
   setHeader(event, 'Content-Type', 'text/yaml; charset=utf-8')
 
   return [
