@@ -284,6 +284,30 @@ export async function verifyStorageConfig(input: OssConfig): Promise<Verificatio
   if (!deleteResponse.ok) {
     const deleteDetail = await responseTextSuffix(deleteResponse)
 
+    if (provider === 'upyun_uss') {
+      const downloadResponse = await fetch(createSignedObjectUrl('GET', objectKey, input), {
+        method: 'GET'
+      })
+
+      if (downloadResponse.ok) {
+        await downloadResponse.arrayBuffer().catch(() => null)
+
+        return {
+          ok: true,
+          status: downloadResponse.status,
+          message: `UPYUN USS upload and download verified. Temporary object cleanup failed with ${deleteResponse.status}${deleteDetail}; please delete it manually if needed. Test object: ${objectKey}`
+        }
+      }
+
+      const downloadDetail = await responseTextSuffix(downloadResponse)
+
+      return {
+        ok: false,
+        status: deleteResponse.status,
+        message: `Upload succeeded but delete failed with ${deleteResponse.status}${deleteDetail}; download check also failed with ${downloadResponse.status}${downloadDetail}. Test object: ${objectKey}`
+      }
+    }
+
     return {
       ok: false,
       status: deleteResponse.status,

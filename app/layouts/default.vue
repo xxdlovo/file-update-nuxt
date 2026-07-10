@@ -15,6 +15,10 @@ const navigation = [{
   icon: 'i-lucide-files',
   to: '/files'
 }, {
+  label: '数据统计',
+  icon: 'i-lucide-chart-no-axes-combined',
+  to: '/analytics'
+}, {
   label: '存储配置',
   icon: 'i-lucide-database',
   to: '/storage-configs'

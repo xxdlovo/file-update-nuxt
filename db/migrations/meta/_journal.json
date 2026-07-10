@@ -43,6 +43,34 @@
       "when": 1783558673752,
       "tag": "0005_sour_meteorite",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1783632000000,
+      "tag": "0006_client_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1783718400000,
+      "tag": "0007_client_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1783721600000,
+      "tag": "0008_client_ip_address",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1783725200000,
+      "tag": "0009_clear_default_upyun_cdn_token",
+      "breakpoints": true
     }
   ]
 }

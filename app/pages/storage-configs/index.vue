@@ -46,7 +46,6 @@ const providerLabels: Record<StorageProvider, string> = {
 }
 
 const toast = useToast()
-const defaultUpyunCdnAuthToken = 'yvAAxOQXup34nX'
 const createOpen = ref(false)
 const verifyConfirmOpen = ref(false)
 const creating = ref(false)
@@ -124,18 +123,11 @@ watch(() => form.provider, (provider) => {
       form.endpoint = ''
     }
 
-    if (form.cdnAuthToken === defaultUpyunCdnAuthToken) {
-      form.cdnAuthToken = ''
-    }
-
     return
   }
 
   form.region = 'global'
   form.endpoint = 's3.api.upyun.com'
-  if (!editingConfig.value && !form.cdnAuthToken) {
-    form.cdnAuthToken = defaultUpyunCdnAuthToken
-  }
 })
 
 function resetForm() {
@@ -445,7 +437,7 @@ async function verifyConfig() {
           </UFormField>
 
           <UFormField v-if="form.provider === 'upyun_uss'" label="CDN Token 防盗链密钥" name="cdnAuthToken"
-            :hint="editingConfig ? '留空则保持不变' : '用于生成 _upt 参数'">
+            hint="仅在又拍云 CDN 开启 Token 防盗链时填写；留空则不生成 _upt 参数">
             <UInput v-model="form.cdnAuthToken" class="w-full" type="password" placeholder="xxxxxxxxxxxx" />
           </UFormField>
 

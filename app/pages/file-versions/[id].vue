@@ -22,6 +22,13 @@ type FileVersionDetail = {
     slug: string
     defaultChannel: string
   }
+  releases: Array<{
+    id: number
+    channel: string
+    environment: string
+    active: boolean
+    publishedAt: string
+  }>
 }
 
 type UploadToken = {
@@ -79,6 +86,7 @@ const visibilityItems = [
 ]
 
 const storageConfigs = computed(() => storageConfigsData.value?.items || [])
+const activeReleases = computed(() => version.value?.releases.filter(release => release.active) || [])
 const storageConfigItems = computed(() => storageConfigs.value.map(config => ({
   label: `${config.name} / ${providerLabel(config.provider)} / ${config.bucket}`,
   value: config.id
@@ -368,6 +376,13 @@ async function uploadFile() {
           />
           <h1 class="text-2xl font-semibold">
             文件版本 {{ version?.version || '' }}
+            <UBadge
+              v-if="activeReleases.length"
+              class="ml-2 align-middle"
+              color="success"
+              variant="subtle"
+              label="最新版"
+            />
           </h1>
           <p class="mt-1 text-sm text-muted">
             {{ version?.project.name }}
@@ -579,6 +594,19 @@ async function uploadFile() {
                 variant="subtle"
                 :label="`${version?.channel || '-'} / ${version?.environment || '-'}`"
               />
+            </div>
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-muted">发布目标</span>
+              <div class="flex flex-wrap justify-end gap-1">
+                <UBadge
+                  v-for="release in activeReleases"
+                  :key="release.id"
+                  color="success"
+                  variant="subtle"
+                  :label="`${release.channel} / ${release.environment}`"
+                />
+                <span v-if="!activeReleases.length">-</span>
+              </div>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-muted">可见性</span>

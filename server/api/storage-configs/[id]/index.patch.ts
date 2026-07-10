@@ -10,12 +10,15 @@ export default defineEventHandler(async (event) => {
   const accessKeyId = typeof body.accessKeyId === 'string' && body.accessKeyId.includes('*')
     ? existing.accessKeyId
     : body.accessKeyId
+  const cdnAuthToken = Object.prototype.hasOwnProperty.call(body, 'cdnAuthToken')
+    ? body.cdnAuthToken?.trim() || null
+    : existing.cdnAuthToken
   const values = normalizeStorageConfigInput({
     ...existing,
     ...body,
     accessKeyId,
     accessKeySecret: body.accessKeySecret?.trim() || existing.accessKeySecret,
-    cdnAuthToken: body.cdnAuthToken?.trim() || existing.cdnAuthToken
+    cdnAuthToken
   })
   const db = useDb()
 

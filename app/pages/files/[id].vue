@@ -22,6 +22,12 @@ type FileVersionItem = {
   sha256: string | null
   visibility: string
   publishedAt: string | null
+  activeReleases: Array<{
+    id: number
+    channel: string
+    environment: string
+    publishedAt: string
+  }>
 }
 
 type DownloadStats = {
@@ -551,6 +557,16 @@ async function copyText(value: string, label: string) {
                       <NuxtLink :to="`/file-versions/${version.id}`" class="font-medium text-highlighted">
                         {{ version.version }}
                       </NuxtLink>
+                      <UBadge
+                        v-if="version.activeReleases.length"
+                        class="ml-2"
+                        color="success"
+                        variant="subtle"
+                        label="最新版"
+                      />
+                      <p v-if="version.activeReleases.length" class="mt-1 text-xs text-muted">
+                        {{ version.activeReleases.map(item => `${item.channel}/${item.environment}`).join('、') }}
+                      </p>
                     </td>
                     <td class="px-4 py-3">
                       <UBadge color="neutral" variant="subtle" :label="`${version.channel} / ${version.environment}`" />

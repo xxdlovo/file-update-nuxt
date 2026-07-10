@@ -292,6 +292,172 @@ CREATE INDEX IF NOT EXISTS app_update_check_events_target_idx
 CREATE INDEX IF NOT EXISTS app_update_check_events_source_idx
   ON app_update_check_events (source);
 
+CREATE TABLE IF NOT EXISTS file_client_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  file_project_id INTEGER NOT NULL,
+  file_version_id INTEGER,
+  event_type TEXT NOT NULL,
+  client_id TEXT,
+  client_name TEXT,
+  client_version TEXT,
+  platform TEXT,
+  arch TEXT,
+  channel TEXT NOT NULL DEFAULT 'stable',
+  environment TEXT NOT NULL DEFAULT 'prod',
+  current_version TEXT,
+  startup_duration_ms INTEGER,
+  duration_ms INTEGER,
+  bytes INTEGER,
+  metadata TEXT,
+  source TEXT NOT NULL DEFAULT 'client',
+  user_agent TEXT,
+  referer TEXT,
+  ip_hash TEXT,
+  ip_address TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (file_project_id) REFERENCES file_projects (id) ON DELETE CASCADE,
+  FOREIGN KEY (file_version_id) REFERENCES file_versions (id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS file_client_events_project_created_idx
+  ON file_client_events (file_project_id, created_at);
+
+CREATE INDEX IF NOT EXISTS file_client_events_version_created_idx
+  ON file_client_events (file_version_id, created_at);
+
+CREATE INDEX IF NOT EXISTS file_client_events_type_idx
+  ON file_client_events (event_type);
+
+CREATE INDEX IF NOT EXISTS file_client_events_client_idx
+  ON file_client_events (client_id);
+
+CREATE INDEX IF NOT EXISTS file_client_events_target_idx
+  ON file_client_events (file_project_id, channel, environment);
+
+CREATE TABLE IF NOT EXISTS app_client_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  app_id INTEGER NOT NULL,
+  app_version_id INTEGER,
+  event_type TEXT NOT NULL,
+  client_id TEXT,
+  client_name TEXT,
+  client_version TEXT,
+  platform TEXT,
+  arch TEXT,
+  channel TEXT NOT NULL DEFAULT 'latest',
+  current_version TEXT,
+  startup_duration_ms INTEGER,
+  duration_ms INTEGER,
+  bytes INTEGER,
+  metadata TEXT,
+  source TEXT NOT NULL DEFAULT 'client',
+  user_agent TEXT,
+  referer TEXT,
+  ip_hash TEXT,
+  ip_address TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (app_id) REFERENCES apps (id) ON DELETE CASCADE,
+  FOREIGN KEY (app_version_id) REFERENCES app_versions (id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS app_client_events_app_created_idx
+  ON app_client_events (app_id, created_at);
+
+CREATE INDEX IF NOT EXISTS app_client_events_version_created_idx
+  ON app_client_events (app_version_id, created_at);
+
+CREATE INDEX IF NOT EXISTS app_client_events_type_idx
+  ON app_client_events (event_type);
+
+CREATE INDEX IF NOT EXISTS app_client_events_client_idx
+  ON app_client_events (client_id);
+
+CREATE INDEX IF NOT EXISTS app_client_events_target_idx
+  ON app_client_events (app_id, channel, platform, arch);
+
+CREATE TABLE IF NOT EXISTS file_clients (
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  file_project_id INTEGER NOT NULL,
+  file_version_id INTEGER,
+  client_id TEXT NOT NULL,
+  client_name TEXT,
+  client_version TEXT,
+  platform TEXT,
+  arch TEXT,
+  channel TEXT NOT NULL DEFAULT 'stable',
+  environment TEXT NOT NULL DEFAULT 'prod',
+  current_version TEXT,
+  last_event_type TEXT,
+  event_count INTEGER NOT NULL DEFAULT 0,
+  startup_count INTEGER NOT NULL DEFAULT 0,
+  download_count INTEGER NOT NULL DEFAULT 0,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  total_bytes INTEGER NOT NULL DEFAULT 0,
+  total_startup_duration_ms INTEGER NOT NULL DEFAULT 0,
+  first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  user_agent TEXT,
+  ip_hash TEXT,
+  ip_address TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (file_project_id) REFERENCES file_projects (id) ON DELETE CASCADE,
+  FOREIGN KEY (file_version_id) REFERENCES file_versions (id) ON DELETE SET NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS file_clients_project_client_unique
+  ON file_clients (file_project_id, client_id);
+
+CREATE INDEX IF NOT EXISTS file_clients_project_last_seen_idx
+  ON file_clients (file_project_id, last_seen_at);
+
+CREATE INDEX IF NOT EXISTS file_clients_version_idx
+  ON file_clients (file_version_id);
+
+CREATE INDEX IF NOT EXISTS file_clients_target_idx
+  ON file_clients (file_project_id, channel, environment);
+
+CREATE TABLE IF NOT EXISTS app_clients (
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  app_id INTEGER NOT NULL,
+  app_version_id INTEGER,
+  client_id TEXT NOT NULL,
+  client_name TEXT,
+  client_version TEXT,
+  platform TEXT,
+  arch TEXT,
+  channel TEXT NOT NULL DEFAULT 'latest',
+  current_version TEXT,
+  last_event_type TEXT,
+  event_count INTEGER NOT NULL DEFAULT 0,
+  startup_count INTEGER NOT NULL DEFAULT 0,
+  download_count INTEGER NOT NULL DEFAULT 0,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  total_bytes INTEGER NOT NULL DEFAULT 0,
+  total_startup_duration_ms INTEGER NOT NULL DEFAULT 0,
+  first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  user_agent TEXT,
+  ip_hash TEXT,
+  ip_address TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (app_id) REFERENCES apps (id) ON DELETE CASCADE,
+  FOREIGN KEY (app_version_id) REFERENCES app_versions (id) ON DELETE SET NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS app_clients_app_client_unique
+  ON app_clients (app_id, client_id);
+
+CREATE INDEX IF NOT EXISTS app_clients_app_last_seen_idx
+  ON app_clients (app_id, last_seen_at);
+
+CREATE INDEX IF NOT EXISTS app_clients_version_idx
+  ON app_clients (app_version_id);
+
+CREATE INDEX IF NOT EXISTS app_clients_target_idx
+  ON app_clients (app_id, channel, platform, arch);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   user_id INTEGER,

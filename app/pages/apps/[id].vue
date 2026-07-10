@@ -20,6 +20,13 @@ type AppVersion = {
   releaseNotes: string | null
   publishedAt: string | null
   updatedAt: string
+  activeReleases: Array<{
+    id: number
+    channel: string
+    platform: string
+    arch: string
+    publishedAt: string
+  }>
 }
 
 type VersionFile = {
@@ -479,8 +486,18 @@ async function copyText(value: string, label: string) {
                       <NuxtLink :to="`/versions/${version.id}`" class="font-medium text-highlighted">
                         {{ version.version }}
                       </NuxtLink>
+                      <UBadge
+                        v-if="version.activeReleases.length"
+                        class="ml-2"
+                        color="success"
+                        variant="subtle"
+                        label="最新版"
+                      />
                       <p v-if="version.buildNumber" class="text-xs text-muted">
                         build {{ version.buildNumber }}
+                      </p>
+                      <p v-if="version.activeReleases.length" class="mt-1 text-xs text-muted">
+                        {{ version.activeReleases.map(item => `${item.platform}/${item.arch}`).join('、') }}
                       </p>
                     </td>
                     <td class="px-4 py-3">
