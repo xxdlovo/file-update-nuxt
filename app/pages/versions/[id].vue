@@ -57,6 +57,8 @@ type StorageConfigOption = {
   region: string
 }
 
+type UploadPhase = 'idle' | 'preparing' | 'uploading' | 'hashing' | 'completing'
+
 const route = useRoute()
 const toast = useToast()
 const versionId = computed(() => String(route.params.id))
@@ -69,6 +71,15 @@ const deleteFileOpen = ref(false)
 const deletingFile = ref(false)
 const deleteFileObject = ref(false)
 const uploadError = ref('')
+const uploadProgress = reactive({
+  phase: 'idle' as UploadPhase,
+  loaded: 0,
+  total: 0,
+  percent: 0
+})
+const uploadCanceled = ref(false)
+const uploadRequest = ref<XMLHttpRequest | null>(null)
+const uploadAbortController = ref<AbortController | null>(null)
 const selectedFile = ref<File | null>(null)
 const pendingDeleteFile = ref<UpdateFile | null>(null)
 
@@ -97,6 +108,20 @@ const storageConfigItems = computed(() => storageConfigs.value.map(config => ({
 const platformItems = ['win32', 'darwin', 'linux']
 const archItems = ['x64', 'arm64']
 const packageTypeItems = ['full', 'delta', 'blockmap', 'metadata']
+const uploadProgressLabel = computed(() => ({
+  idle: '等待上传',
+  preparing: '正在申请上传凭证',
+  uploading: '正在上传到对象存储',
+  hashing: '正在计算文件哈希',
+  completing: '正在保存上传结果'
+})[uploadProgress.phase])
+const uploadProgressDescription = computed(() => {
+  if (uploadProgress.phase === 'uploading' && uploadProgress.total > 0) {
+    return `${formatFileSize(uploadProgress.loaded)} / ${formatFileSize(uploadProgress.total)}`
+  }
+
+  return `${uploadProgress.percent}%`
+})
 
 function providerLabel(provider: string) {
   return {
@@ -163,25 +188,98 @@ function onFileChange(event: Event) {
   selectedFile.value = input.files?.[0] || null
 }
 
-async function uploadObject(token: UploadToken, file: File) {
-  if (token.method === 'POST') {
-    const form = new FormData()
+function setUploadProgress(phase: UploadPhase, percent: number, loaded = 0, total = selectedFile.value?.size || 0) {
+  uploadProgress.phase = phase
+  uploadProgress.percent = Math.min(100, Math.max(0, Math.round(percent)))
+  uploadProgress.loaded = loaded
+  uploadProgress.total = total
+}
 
-    for (const [key, value] of Object.entries(token.fields || {})) {
-      form.append(key, value)
-    }
-    form.append('file', file)
+function resetUploadProgress() {
+  setUploadProgress('idle', 0, 0, 0)
+}
 
-    return fetch(token.uploadUrl, {
-      method: 'POST',
-      body: form
-    })
+function createUploadCanceledError() {
+  const error = new Error('上传已取消')
+  error.name = 'AbortError'
+
+  return error
+}
+
+function isUploadCanceledError(error: unknown) {
+  return error instanceof Error && error.name === 'AbortError'
+}
+
+function assertUploadNotCanceled() {
+  if (uploadCanceled.value) {
+    throw createUploadCanceledError()
+  }
+}
+
+function cancelUpload() {
+  if (!uploading.value) {
+    return
   }
 
-  return fetch(token.uploadUrl, {
-    method: token.method,
-    headers: token.headers,
-    body: file
+  uploadCanceled.value = true
+  uploadAbortController.value?.abort()
+  uploadRequest.value?.abort()
+  uploadError.value = '正在取消上传...'
+}
+
+function uploadObject(token: UploadToken, file: File) {
+  return new Promise<{ ok: boolean, status: number, statusText: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    let body: BodyInit
+
+    uploadRequest.value = xhr
+    xhr.open(token.method, token.uploadUrl)
+
+    if (token.method === 'POST') {
+      const form = new FormData()
+
+      for (const [key, value] of Object.entries(token.fields || {})) {
+        form.append(key, value)
+      }
+      form.append('file', file)
+      body = form
+    } else {
+      for (const [key, value] of Object.entries(token.headers || {})) {
+        xhr.setRequestHeader(key, value)
+      }
+      body = file
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        setUploadProgress('uploading', (event.loaded / event.total) * 100, event.loaded, event.total)
+      }
+    }
+
+    xhr.onload = () => {
+      if (uploadRequest.value === xhr) {
+        uploadRequest.value = null
+      }
+      setUploadProgress('uploading', 100, file.size, file.size)
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        statusText: xhr.statusText
+      })
+    }
+    xhr.onerror = () => {
+      if (uploadRequest.value === xhr) {
+        uploadRequest.value = null
+      }
+      reject(new Error('Object storage upload failed'))
+    }
+    xhr.onabort = () => {
+      if (uploadRequest.value === xhr) {
+        uploadRequest.value = null
+      }
+      reject(createUploadCanceledError())
+    }
+    xhr.send(body)
   })
 }
 
@@ -275,10 +373,14 @@ async function uploadFile() {
 
   uploadError.value = ''
   uploading.value = true
+  resetUploadProgress()
+  uploadCanceled.value = false
+  uploadAbortController.value = new AbortController()
 
   try {
     const file = selectedFile.value
     const contentType = file.type || 'application/octet-stream'
+    setUploadProgress('preparing', 5, 0, file.size)
     const token = await $fetch<UploadToken>('/api/update-files/upload-token', {
       method: 'POST',
       body: {
@@ -289,20 +391,27 @@ async function uploadFile() {
         arch: uploadForm.arch,
         packageType: uploadForm.packageType,
         contentType
-      }
+      },
+      signal: uploadAbortController.value.signal
     })
+    assertUploadNotCanceled()
 
+    setUploadProgress('uploading', 0, 0, file.size)
     const response = await uploadObject(token, file)
+    assertUploadNotCanceled()
 
     if (!response.ok) {
       throw new Error(`Object storage upload failed with ${response.status}`)
     }
 
+    setUploadProgress('hashing', 100, file.size, file.size)
     const [sha256, sha512] = await Promise.all([
       digestFile(file, 'SHA-256'),
       digestFile(file, 'SHA-512')
     ])
+    assertUploadNotCanceled()
 
+    setUploadProgress('completing', 100, file.size, file.size)
     await $fetch('/api/update-files/complete', {
       method: 'POST',
       body: {
@@ -319,8 +428,10 @@ async function uploadFile() {
         sha256,
         sha512,
         mimeType: contentType
-      }
+      },
+      signal: uploadAbortController.value.signal
     })
+    assertUploadNotCanceled()
 
     toast.add({
       title: '文件已上传',
@@ -329,11 +440,17 @@ async function uploadFile() {
     selectedFile.value = null
     uploadOpen.value = false
     await refreshFiles()
+    resetUploadProgress()
   } catch (error) {
-    uploadError.value = error instanceof Error
-      ? error.message
-      : '上传失败，请检查对象存储配置'
+    uploadError.value = isUploadCanceledError(error)
+      ? '上传已取消'
+      : error instanceof Error
+        ? error.message
+        : '上传失败，请检查对象存储配置'
   } finally {
+    uploadRequest.value = null
+    uploadAbortController.value = null
+    uploadCanceled.value = false
     uploading.value = false
   }
 }
@@ -724,16 +841,24 @@ async function deleteFile() {
             :title="selectedFile.name"
             :description="formatFileSize(selectedFile.size)"
           />
+
+          <div v-if="uploading" class="rounded-md border border-muted bg-elevated/50 p-4">
+            <div class="mb-2 flex items-center justify-between gap-3 text-sm">
+              <span class="font-medium">{{ uploadProgressLabel }}</span>
+              <span class="text-muted">{{ uploadProgressDescription }}</span>
+            </div>
+            <UProgress v-model="uploadProgress.percent" color="primary" size="md" :max="100" />
+          </div>
         </form>
       </template>
 
       <template #footer="{ close }">
         <UButton
-          color="neutral"
+          :color="uploading ? 'warning' : 'neutral'"
           variant="outline"
-          label="取消"
-          :disabled="uploading"
-          @click="close"
+          :icon="uploading ? 'i-lucide-x' : undefined"
+          :label="uploading ? '取消上传' : '取消'"
+          @click="uploading ? cancelUpload() : close()"
         />
         <UButton
           type="submit"
