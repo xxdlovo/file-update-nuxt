@@ -3,6 +3,22 @@ definePageMeta({
   layout: false
 })
 
+type ShareFileVersion = {
+  id: number
+  version: string
+  channel: string
+  environment: string
+  releaseNotes: string | null
+  fileName: string
+  size: number
+  sha256: string | null
+  mimeType: string | null
+  visibility: string
+  publishedAt: string | null
+  downloadCount: number
+  downloadUrl: string
+}
+
 type ShareFilePayload = {
   project: {
     id: number
@@ -12,20 +28,8 @@ type ShareFilePayload = {
     description: string | null
     defaultChannel: string
   }
-  version: {
-    id: number
-    version: string
-    channel: string
-    environment: string
-    releaseNotes: string | null
-    fileName: string
-    size: number
-    sha256: string | null
-    mimeType: string | null
-    visibility: string
-    publishedAt: string | null
-    downloadCount: number
-  }
+  version: ShareFileVersion
+  versions: ShareFileVersion[]
   release: {
     channel: string
     environment: string
@@ -80,6 +84,22 @@ const downloadPath = computed(() => {
 
   return `/api/public/files/${encodeURIComponent(data.value.project.slug)}/share-download${queryString ? `?${queryString}` : ''}`
 })
+
+const versions = computed(() => data.value?.versions || [])
+
+function versionDownloadPath(version: string) {
+  if (!data.value?.project.slug) {
+    return ''
+  }
+
+  const params = new URLSearchParams()
+
+  params.set('channel', data.value.release.channel || data.value.project.defaultChannel)
+  params.set('env', data.value.release.environment || 'prod')
+  params.set('version', version)
+
+  return `/api/public/files/${encodeURIComponent(data.value.project.slug)}/share-download?${params.toString()}`
+}
 
 const shareUrl = computed(() => {
   if (!import.meta.client) {
@@ -186,7 +206,7 @@ async function copyShareUrl() {
         />
       </header>
 
-      <div class="flex flex-1 items-start py-8">
+      <div class="flex w-full flex-1 flex-col gap-6 py-8">
         <UCard v-if="error" class="w-full">
           <div class="flex flex-col gap-5 sm:flex-row sm:items-start">
             <div class="flex size-12 shrink-0 items-center justify-center rounded bg-elevated">
@@ -300,6 +320,82 @@ async function copyShareUrl() {
                 <span class="text-right">{{ data?.version.mimeType || '-' }}</span>
               </div>
             </aside>
+          </div>
+        </UCard>
+
+        <UCard v-if="!error && versions.length > 1" class="w-full">
+          <template #header>
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 class="text-lg font-semibold">
+                最近版本
+              </h2>
+              <p class="text-xs text-muted">
+                仅列出可见性为 public 的已发布版本，按版本号从新到旧，最多 10 个
+              </p>
+            </div>
+          </template>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="border-b border-muted text-muted">
+                <tr>
+                  <th class="px-3 py-3 font-medium">
+                    版本
+                  </th>
+                  <th class="px-3 py-3 font-medium">
+                    文件
+                  </th>
+                  <th class="px-3 py-3 font-medium">
+                    大小
+                  </th>
+                  <th class="px-3 py-3 font-medium">
+                    发布时间
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="item in versions"
+                  :key="item.id"
+                  class="border-b border-muted last:border-b-0"
+                >
+                  <td class="px-3 py-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-medium">{{ item.version }}</span>
+                      <UBadge
+                        v-if="item.id === data?.version.id"
+                        color="success"
+                        variant="subtle"
+                        label="当前"
+                      />
+                    </div>
+                  </td>
+                  <td class="max-w-[22rem] px-3 py-3 break-all">
+                    {{ item.fileName }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-3">
+                    {{ formatFileSize(item.size) }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-3">
+                    {{ formatTime(item.publishedAt) }}
+                  </td>
+                  <td class="px-3 py-3 text-right">
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="outline"
+                      icon="i-lucide-download"
+                      label="下载"
+                      :to="versionDownloadPath(item.version) || undefined"
+                      external
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </UCard>
       </div>

@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { fileDownloadEvents, fileProjects, fileReleases, fileUpdateCheckEvents, fileVersions } from '../../db/schema'
 
@@ -131,6 +131,62 @@ export async function getActiveFileRelease(input: {
   }
 
   return release
+}
+
+export async function listPublicFileVersions(input: {
+  fileProjectId: number
+  channel: string
+  environment: string
+  limit?: number
+}) {
+  const db = useDb()
+
+  return db.query.fileVersions.findMany({
+    where: and(
+      eq(fileVersions.fileProjectId, input.fileProjectId),
+      eq(fileVersions.channel, input.channel),
+      eq(fileVersions.environment, input.environment),
+      eq(fileVersions.status, 'published'),
+      eq(fileVersions.visibility, 'public')
+    ),
+    orderBy: [desc(fileVersions.versionNormalized), desc(fileVersions.id)],
+    limit: input.limit ?? 10
+  })
+}
+
+export async function getPublicFileVersion(input: {
+  fileProjectId: number
+  channel: string
+  environment: string
+  versionId?: number
+  version?: string
+}) {
+  if (!input.versionId && !input.version) {
+    return null
+  }
+
+  const db = useDb()
+  const conditions = [
+    eq(fileVersions.fileProjectId, input.fileProjectId),
+    eq(fileVersions.channel, input.channel),
+    eq(fileVersions.environment, input.environment),
+    eq(fileVersions.status, 'published'),
+    eq(fileVersions.visibility, 'public')
+  ]
+
+  if (input.versionId) {
+    conditions.push(eq(fileVersions.id, input.versionId))
+  }
+
+  if (input.version) {
+    conditions.push(eq(fileVersions.version, input.version))
+  }
+
+  const version = await db.query.fileVersions.findFirst({
+    where: and(...conditions)
+  })
+
+  return version || null
 }
 
 export function serializePublicFileVersion(version: typeof fileVersions.$inferSelect, downloadUrl: string) {

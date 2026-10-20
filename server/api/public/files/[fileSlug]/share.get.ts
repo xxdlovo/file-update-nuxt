@@ -33,6 +33,22 @@ export default defineEventHandler(async (event) => {
   }
 
   const downloadUrl = await createSignedDownloadUrl(release.version.objectKey, release.version.storageConfigId)
+  const publicVersions = await listPublicFileVersions({
+    fileProjectId: project.id,
+    channel,
+    environment,
+    limit: 10
+  })
+  const versions = await Promise.all(publicVersions.map(async (item) => {
+    const itemDownloadUrl = item.id === release.version.id
+      ? downloadUrl
+      : await createSignedDownloadUrl(item.objectKey, item.storageConfigId)
+
+    return {
+      ...serializePublicFileVersion(item, itemDownloadUrl),
+      downloadCount: item.downloadCount
+    }
+  }))
 
   return {
     project: {
@@ -47,6 +63,7 @@ export default defineEventHandler(async (event) => {
       ...serializePublicFileVersion(release.version, downloadUrl),
       downloadCount: release.version.downloadCount
     },
+    versions,
     release: {
       channel: release.channel,
       environment: release.environment,
