@@ -123,6 +123,7 @@ export const fileProjects = sqliteTable('file_projects', {
   slug: text('slug').notNull(),
   category: text('category'),
   defaultChannel: text('default_channel').notNull().default('stable'),
+  defaultVisibility: text('default_visibility').notNull().default('signed'),
   secretHash: text('secret_hash'),
   description: text('description'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

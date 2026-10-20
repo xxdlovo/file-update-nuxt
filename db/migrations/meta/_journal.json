@@ -71,6 +71,13 @@
       "when": 1783725200000,
       "tag": "0009_clear_default_upyun_cdn_token",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792480481891,
+      "tag": "0010_file_project_default_visibility",
+      "breakpoints": true
     }
   ]
 }

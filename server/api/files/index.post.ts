@@ -8,6 +8,7 @@ export default defineEventHandler(async (event) => {
     slug?: string
     category?: string
     defaultChannel?: string
+    defaultVisibility?: string
     enabled?: boolean
     description?: string
   }>(event)
@@ -15,6 +16,7 @@ export default defineEventHandler(async (event) => {
   const name = body.name?.trim()
   const slug = normalizeSlug(body.slug || body.name || '')
   const defaultChannel = body.defaultChannel?.trim() || 'stable'
+  const defaultVisibility = normalizeFileVisibility(body.defaultVisibility, 'signed')
 
   if (!name) {
     throw createError({ statusCode: 400, statusMessage: 'Project name is required' })
@@ -32,6 +34,7 @@ export default defineEventHandler(async (event) => {
       slug,
       category: body.category?.trim() || null,
       defaultChannel,
+      defaultVisibility,
       enabled: body.enabled ?? true,
       description: body.description?.trim() || null
     }).returning()

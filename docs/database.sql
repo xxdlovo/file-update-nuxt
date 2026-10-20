@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS file_projects (
   slug TEXT NOT NULL,
   category TEXT,
   default_channel TEXT NOT NULL DEFAULT 'stable',
+  default_visibility TEXT NOT NULL DEFAULT 'signed',
   secret_hash TEXT,
   description TEXT,
   enabled INTEGER NOT NULL DEFAULT 1,

@@ -5,6 +5,7 @@ type FileProjectItem = {
   slug: string
   category: string | null
   defaultChannel: string
+  defaultVisibility: string
   enabled: boolean
   description: string | null
   updatedAt: string
@@ -23,9 +24,15 @@ const form = reactive({
   slug: '',
   category: '',
   defaultChannel: 'stable',
+  defaultVisibility: 'signed',
   enabled: true,
   description: ''
 })
+
+const visibilityItems = [
+  { label: '签名访问', value: 'signed' },
+  { label: '公开分享', value: 'public' }
+]
 
 const query = computed(() => ({
   q: search.value || undefined,
@@ -70,6 +77,7 @@ function openEditModal(project: FileProjectItem) {
   form.slug = project.slug
   form.category = project.category || ''
   form.defaultChannel = project.defaultChannel
+  form.defaultVisibility = project.defaultVisibility || 'signed'
   form.enabled = project.enabled
   form.description = project.description || ''
   slugTouched.value = true
@@ -82,6 +90,7 @@ function resetForm() {
   form.slug = ''
   form.category = ''
   form.defaultChannel = 'stable'
+  form.defaultVisibility = 'signed'
   form.enabled = true
   form.description = ''
   slugTouched.value = false
@@ -185,6 +194,9 @@ async function disableProject(project: FileProjectItem) {
                   默认通道
                 </th>
                 <th class="px-4 py-3 font-medium">
+                  默认可见性
+                </th>
+                <th class="px-4 py-3 font-medium">
                   状态
                 </th>
                 <th class="px-4 py-3 text-right font-medium">
@@ -194,12 +206,12 @@ async function disableProject(project: FileProjectItem) {
             </thead>
             <tbody>
               <tr v-if="status === 'pending'">
-                <td class="px-4 py-8 text-center text-muted" colspan="5">
+                <td class="px-4 py-8 text-center text-muted" colspan="6">
                   加载中
                 </td>
               </tr>
               <tr v-else-if="projects.length === 0">
-                <td class="px-4 py-8 text-center text-muted" colspan="5">
+                <td class="px-4 py-8 text-center text-muted" colspan="6">
                   暂无文件项目
                 </td>
               </tr>
@@ -222,6 +234,13 @@ async function disableProject(project: FileProjectItem) {
                   </td>
                   <td class="px-4 py-3">
                     <UBadge color="neutral" variant="subtle" :label="project.defaultChannel" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <UBadge
+                      :color="project.defaultVisibility === 'public' ? 'success' : 'neutral'"
+                      variant="subtle"
+                      :label="project.defaultVisibility === 'public' ? '公开分享' : '签名访问'"
+                    />
                   </td>
                   <td class="px-4 py-3">
                     <UBadge
@@ -304,6 +323,14 @@ async function disableProject(project: FileProjectItem) {
 
           <UFormField label="默认通道" name="defaultChannel" required>
             <UInput v-model="form.defaultChannel" class="w-full" placeholder="stable" />
+          </UFormField>
+
+          <UFormField
+            label="默认可见性"
+            name="defaultVisibility"
+            description="新建文件版本（含 CI 发布）未单独指定可见性时使用；公开分享的版本才能在分享页展示和下载。"
+          >
+            <USelect v-model="form.defaultVisibility" class="w-full" :items="visibilityItems" />
           </UFormField>
 
           <USwitch v-model="form.enabled" label="启用项目" />

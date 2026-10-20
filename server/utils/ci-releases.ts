@@ -396,15 +396,8 @@ export async function prepareCiFileRelease(event: Parameters<typeof writeAuditLo
   const version = body.version?.trim()
     ? assertVersion(body.version)
     : await resolveNextFileVersion(project.id, channel, environment)
-  const visibility = body.visibility?.trim() || 'signed'
+  const visibility = normalizeFileVisibility(body.visibility, project.defaultVisibility)
   const fileName = assertFileName(body.fileName)
-
-  if (!['signed', 'public'].includes(visibility)) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Invalid visibility'
-    })
-  }
 
   const db = useDb()
   const now = new Date().toISOString()
@@ -421,7 +414,8 @@ export async function prepareCiFileRelease(event: Parameters<typeof writeAuditLo
     const [updated] = await db.update(fileVersions)
       .set({
         releaseNotes: body.releaseNotes?.trim() || fileVersion.releaseNotes,
-        visibility,
+        // 未显式传入可见性时保留原值，避免重复上传/prepare 把已公开的版本降级为签名访问
+        ...(body.visibility?.trim() ? { visibility } : {}),
         updatedAt: now
       })
       .where(eq(fileVersions.id, fileVersion.id))

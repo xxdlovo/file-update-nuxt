@@ -325,7 +325,7 @@ Content-Type: application/json
 | `channel` | string | 否 | 发布通道；不传时使用项目默认通道 |
 | `environment` | string | 否 | 环境；默认 `prod` |
 | `releaseNotes` | string | 否 | 发布说明 |
-| `visibility` | string | 否 | 下载可见性，支持 `signed`、`public`；默认 `signed` |
+| `visibility` | string | 否 | 下载可见性，支持 `signed`、`public`；不传时使用文件项目的默认可见性（未配置时为 `signed`）；重复 prepare 不会覆盖已有版本的可见性 |
 | `fileName` | string | 是 | 原始文件名 |
 | `contentType` | string | 否 | MIME 类型；默认 `application/octet-stream` |
 | `storageConfigId` | number | 否 | 指定已验证的存储配置 |

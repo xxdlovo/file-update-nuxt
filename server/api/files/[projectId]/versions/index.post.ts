@@ -23,14 +23,7 @@ export default defineEventHandler(async (event) => {
 
   const channel = body.channel?.trim() || project.defaultChannel
   const environment = body.environment?.trim() || 'prod'
-  const visibility = body.visibility?.trim() || 'signed'
-
-  if (!['signed', 'public'].includes(visibility)) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Invalid visibility'
-    })
-  }
+  const visibility = normalizeFileVisibility(body.visibility, project.defaultVisibility)
 
   const db = useDb()
 

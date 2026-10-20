@@ -11,6 +11,7 @@ export default defineEventHandler(async (event) => {
     slug?: string
     category?: string | null
     defaultChannel?: string
+    defaultVisibility?: string
     enabled?: boolean
     description?: string | null
   }>(event)
@@ -44,6 +45,10 @@ export default defineEventHandler(async (event) => {
 
   if (typeof body.defaultChannel === 'string') {
     values.defaultChannel = body.defaultChannel.trim() || existing.defaultChannel
+  }
+
+  if (typeof body.defaultVisibility === 'string') {
+    values.defaultVisibility = normalizeFileVisibility(body.defaultVisibility, existing.defaultVisibility)
   }
 
   if (typeof body.enabled === 'boolean') {

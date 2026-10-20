@@ -5,6 +5,7 @@ type FileProjectDetail = {
   slug: string
   category: string | null
   defaultChannel: string
+  defaultVisibility: string
   enabled: boolean
   description: string | null
 }
@@ -107,6 +108,8 @@ const visibilityItems = [
   { label: '公开分享', value: 'public' }
 ]
 
+const updatingVisibility = ref(false)
+
 const { data: project, refresh } = useLazyFetch<FileProjectDetail>(() => `/api/files/${projectId.value}`)
 const { data: versionsData, refresh: refreshVersions } = useLazyFetch<{ items: FileVersionItem[], total: number }>(
   () => `/api/files/${projectId.value}/versions`
@@ -117,6 +120,11 @@ const { data: downloadStats, status: downloadStatsStatus, refresh: refreshDownlo
 )
 
 const versions = computed(() => versionsData.value?.items || [])
+const activeVersion = computed(() => {
+  return versions.value.find(version => version.activeReleases.some(
+    release => release.channel === endpointForm.channel && release.environment === endpointForm.environment
+  )) || null
+})
 const downloadingStats = computed(() => downloadStatsStatus.value === 'pending' || downloadStatsStatus.value === 'idle')
 const maxDailyDownloads = computed(() => Math.max(...(downloadStats.value?.daily.map(item => Math.max(item.downloads, item.checks)) || [0]), 1))
 const channelItems = computed(() => {
@@ -212,6 +220,7 @@ watch(project, (value) => {
 
   if (!versionModalOpen.value || !editingVersion.value) {
     versionForm.channel = value.defaultChannel
+    versionForm.visibility = value.defaultVisibility || 'signed'
   }
   endpointForm.channel = value.defaultChannel
 }, { immediate: true })
@@ -238,6 +247,39 @@ function statusColor(status: string) {
 
 function visibilityLabel(visibility: string) {
   return visibility === 'public' ? '公开分享' : '签名访问'
+}
+
+async function updateActiveVisibility(visibility: string) {
+  const version = activeVersion.value
+
+  if (!version || version.visibility === visibility) {
+    return
+  }
+
+  updatingVisibility.value = true
+
+  try {
+    await $fetch(`/api/file-versions/${version.id}`, {
+      method: 'PATCH',
+      body: { visibility }
+    })
+    toast.add({
+      title: visibility === 'public' ? '当前生效版本已设为公开分享' : '当前生效版本已设为签名访问',
+      color: 'success',
+      icon: visibility === 'public' ? 'i-lucide-unlock' : 'i-lucide-lock'
+    })
+    await refreshVersions()
+  } catch (error) {
+    toast.add({
+      title: '可见性更新失败',
+      description: error && typeof error === 'object' && 'statusMessage' in error
+        ? String(error.statusMessage)
+        : '请稍后重试',
+      color: 'error'
+    })
+  } finally {
+    updatingVisibility.value = false
+  }
 }
 
 function formatFileSize(size: number) {
@@ -286,7 +328,7 @@ function resetVersionForm() {
   versionForm.version = ''
   versionForm.channel = project.value?.defaultChannel || 'stable'
   versionForm.environment = 'prod'
-  versionForm.visibility = 'signed'
+  versionForm.visibility = project.value?.defaultVisibility || 'signed'
   versionForm.releaseNotes = ''
   versionError.value = ''
 }
@@ -962,6 +1004,36 @@ async function copyText(value: string, label: string) {
               <code class="block break-all rounded bg-elevated px-2 py-1 text-xs">
                 {{ downloadUrl || '-' }}
               </code>
+            </div>
+
+            <div class="rounded border border-muted p-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p class="text-muted">
+                    当前生效版本可见性
+                  </p>
+                  <p class="text-xs text-muted">
+                    <template v-if="activeVersion">
+                      {{ activeVersion.version }} · {{ activeVersion.channel }} / {{ activeVersion.environment }}
+                    </template>
+                    <template v-else>
+                      暂无 {{ endpointForm.channel }} / {{ endpointForm.environment }} 的生效版本
+                    </template>
+                  </p>
+                </div>
+                <USelect
+                  v-if="activeVersion"
+                  :model-value="activeVersion.visibility"
+                  :items="visibilityItems"
+                  class="w-36"
+                  :loading="updatingVisibility"
+                  :disabled="updatingVisibility"
+                  @update:model-value="updateActiveVisibility(String($event))"
+                />
+              </div>
+              <p v-if="activeVersion && activeVersion.visibility !== 'public'" class="mt-2 text-xs text-warning">
+                该版本是签名访问，公开分享页会提示“当前文件版本未公开”。切换为公开分享后立即生效。
+              </p>
             </div>
 
             <div>
