@@ -528,9 +528,21 @@ async function copyText(value: string, label: string) {
               <UBadge class="mt-1" color="neutral" variant="subtle" :label="project?.defaultChannel || '-'" />
             </div>
 
+            <div>
+              <p class="text-muted">
+                默认可见性
+              </p>
+              <UBadge
+                class="mt-1"
+                :color="project?.defaultVisibility === 'public' ? 'success' : 'neutral'"
+                variant="subtle"
+                :label="project?.defaultVisibility === 'public' ? '公开分享' : '签名访问'"
+              />
+            </div>
+
             <div class="lg:col-span-2">
               <p class="text-muted">
-                描述
+                备注
               </p>
               <p class="mt-1 whitespace-pre-wrap">
                 {{ project?.description || '-' }}

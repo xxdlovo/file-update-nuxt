@@ -89,6 +89,16 @@ const shareUrl = computed(() => {
   return window.location.href
 })
 
+const projectName = computed(() => data.value?.project.name || '')
+const remark = computed(() => data.value?.project.description || '')
+
+useHead(() => ({
+  title: projectName.value ? `${projectName.value} · 文件分享` : '文件分享',
+  meta: remark.value
+    ? [{ name: 'description', content: remark.value }]
+    : []
+}))
+
 const errorTitle = computed(() => {
   const statusCode = error.value?.statusCode
 
@@ -153,14 +163,17 @@ async function copyShareUrl() {
 <template>
   <main class="min-h-screen bg-default text-default">
     <section class="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-8">
-      <header class="flex items-center justify-between border-b border-muted pb-5">
-        <div>
+      <header class="flex flex-col gap-4 border-b border-muted pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0">
           <p class="text-sm text-muted">
             文件分享
           </p>
-          <h1 class="mt-1 text-xl font-semibold">
-            Electron Update
+          <h1 class="mt-1 break-all text-2xl font-semibold">
+            {{ projectName || '公开分享' }}
           </h1>
+          <p v-if="remark" class="mt-2 max-w-2xl whitespace-pre-wrap text-sm text-muted">
+            {{ remark }}
+          </p>
         </div>
 
         <UButton
@@ -173,7 +186,7 @@ async function copyShareUrl() {
         />
       </header>
 
-      <div class="flex flex-1 items-center py-10">
+      <div class="flex flex-1 items-start py-8">
         <UCard v-if="error" class="w-full">
           <div class="flex flex-col gap-5 sm:flex-row sm:items-start">
             <div class="flex size-12 shrink-0 items-center justify-center rounded bg-elevated">
@@ -192,27 +205,19 @@ async function copyShareUrl() {
 
         <UCard v-else class="w-full">
           <template #header>
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <UBadge
-                    v-if="data?.project.category"
-                    color="neutral"
-                    variant="subtle"
-                    :label="data.project.category"
-                  />
-                  <UBadge
-                    color="success"
-                    variant="subtle"
-                    label="公开文件"
-                  />
-                </div>
-                <h2 class="mt-3 text-2xl font-semibold">
-                  {{ data?.project.name || '正在加载文件' }}
-                </h2>
-                <p class="mt-2 max-w-2xl whitespace-pre-wrap text-sm text-muted">
-                  {{ data?.project.description || '此文件由发布管理后台公开分享。' }}
-                </p>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex flex-wrap items-center gap-2">
+                <UBadge
+                  v-if="data?.project.category"
+                  color="neutral"
+                  variant="subtle"
+                  :label="data.project.category"
+                />
+                <UBadge
+                  color="success"
+                  variant="subtle"
+                  label="公开文件"
+                />
               </div>
 
               <div class="flex shrink-0 gap-2">

@@ -335,8 +335,12 @@ async function disableProject(project: FileProjectItem) {
 
           <USwitch v-model="form.enabled" label="启用项目" />
 
-          <UFormField label="描述" name="description">
-            <UTextarea v-model="form.description" class="w-full" :rows="3" />
+          <UFormField
+            label="备注"
+            name="description"
+            description="展示在公开分享页标题下方，可留空。"
+          >
+            <UTextarea v-model="form.description" class="w-full" :rows="3" placeholder="例如：内部工具，安装后请重启浏览器" />
           </UFormField>
         </form>
       </template>
