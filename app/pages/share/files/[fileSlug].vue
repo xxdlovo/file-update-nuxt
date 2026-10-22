@@ -87,6 +87,14 @@ const downloadPath = computed(() => {
 
 const versions = computed(() => data.value?.versions || [])
 
+const directDownloadPath = computed(() => {
+  if (!downloadPath.value) {
+    return ''
+  }
+
+  return `${downloadPath.value}${downloadPath.value.includes('?') ? '&' : '?'}direct=1`
+})
+
 function versionDownloadPath(version: string) {
   if (!data.value?.project.slug) {
     return ''
@@ -99,6 +107,12 @@ function versionDownloadPath(version: string) {
   params.set('version', version)
 
   return `/api/public/files/${encodeURIComponent(data.value.project.slug)}/share-download?${params.toString()}`
+}
+
+function versionDirectPath(version: string) {
+  const path = versionDownloadPath(version)
+
+  return path ? `${path}&direct=1` : ''
 }
 
 const shareUrl = computed(() => {
@@ -256,6 +270,16 @@ async function copyShareUrl() {
                   :disabled="!downloadPath"
                   external
                 />
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-zap"
+                  label="直连下载"
+                  title="直接跳转对象存储 / CDN，速度更快，但文件名以存储对象为准"
+                  :to="directDownloadPath || undefined"
+                  :disabled="!directDownloadPath"
+                  external
+                />
               </div>
             </div>
           </template>
@@ -383,20 +407,36 @@ async function copyShareUrl() {
                     {{ formatTime(item.publishedAt) }}
                   </td>
                   <td class="px-3 py-3 text-right">
-                    <UButton
-                      size="xs"
-                      color="neutral"
-                      variant="outline"
-                      icon="i-lucide-download"
-                      label="下载"
-                      :to="versionDownloadPath(item.version) || undefined"
-                      external
-                    />
+                    <div class="flex justify-end gap-2">
+                      <UButton
+                        size="xs"
+                        color="neutral"
+                        variant="outline"
+                        icon="i-lucide-download"
+                        label="下载"
+                        :to="versionDownloadPath(item.version) || undefined"
+                        external
+                      />
+                      <UButton
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        icon="i-lucide-zap"
+                        aria-label="直连下载"
+                        title="直连下载：直接跳转对象存储 / CDN，文件名以存储对象为准"
+                        :to="versionDirectPath(item.version) || undefined"
+                        external
+                      />
+                    </div>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
+
+          <p class="mt-3 text-xs text-muted">
+            「下载」由服务器转发并使用原始文件名（会按 SHA-256 缓存，热门文件不重复占用 CDN 流量）；「直连」直接跳转对象存储 / CDN，速度更快，但保存的文件名以存储对象为准。
+          </p>
         </UCard>
       </div>
     </section>

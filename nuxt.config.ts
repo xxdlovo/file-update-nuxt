@@ -64,6 +64,10 @@ export default defineNuxtConfig({
     fileUpdateTokenRequired: process.env.FILE_UPDATE_TOKEN_REQUIRED === 'true',
     ciApiToken: process.env.CI_API_TOKEN,
     ciApiTokenHash: process.env.CI_API_TOKEN_SHA256,
+    downloadCacheEnabled: process.env.DOWNLOAD_CACHE_ENABLED !== 'false',
+    downloadCacheDir: process.env.DOWNLOAD_CACHE_DIR || './data/download-cache',
+    downloadCacheMaxFileBytes: Number(process.env.DOWNLOAD_CACHE_MAX_FILE_BYTES || 536870912),
+    downloadCacheMaxBytes: Number(process.env.DOWNLOAD_CACHE_MAX_BYTES || 2147483648),
     public: {
       downloadUrlExpiresSeconds: Number(process.env.DOWNLOAD_URL_EXPIRES_SECONDS || 600)
     }

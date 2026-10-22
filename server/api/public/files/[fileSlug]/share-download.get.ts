@@ -13,6 +13,30 @@ export default defineEventHandler(async (event) => {
   const channel = String(query.channel || project.defaultChannel)
   const environment = String(query.env || query.environment || 'prod')
   const versionParam = String(query.version || '').trim()
+  // direct=1：直接 302 到对象存储/CDN 签名地址，不经过服务端中转
+  const direct = ['1', 'true', 'yes'].includes(String(query.direct || '').toLowerCase())
+
+  async function respondWithVersion(version: NonNullable<Awaited<ReturnType<typeof getPublicFileVersion>>>) {
+    await recordFileVersionDownload({
+      version,
+      event,
+      source: 'share'
+    })
+
+    const downloadUrl = await createSignedDownloadUrl(version.objectKey, version.storageConfigId)
+
+    if (direct) {
+      return sendRedirect(event, downloadUrl, 302)
+    }
+
+    return streamFileDownload(event, {
+      url: downloadUrl,
+      fileName: version.fileName,
+      mimeType: version.mimeType,
+      sha256: version.sha256,
+      size: version.size
+    })
+  }
 
   if (versionParam) {
     const version = await getPublicFileVersion({
@@ -29,19 +53,7 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    await recordFileVersionDownload({
-      version,
-      event,
-      source: 'share'
-    })
-
-    const versionDownloadUrl = await createSignedDownloadUrl(version.objectKey, version.storageConfigId)
-
-    return streamFileDownload(event, {
-      url: versionDownloadUrl,
-      fileName: version.fileName,
-      mimeType: version.mimeType
-    })
+    return respondWithVersion(version)
   }
 
   const release = await getActiveFileRelease({
@@ -64,17 +76,5 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await recordFileVersionDownload({
-    version: release.version,
-    event,
-    source: 'share'
-  })
-
-  const downloadUrl = await createSignedDownloadUrl(release.version.objectKey, release.version.storageConfigId)
-
-  return streamFileDownload(event, {
-    url: downloadUrl,
-    fileName: release.version.fileName,
-    mimeType: release.version.mimeType
-  })
+  return respondWithVersion(release.version)
 })

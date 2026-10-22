@@ -90,6 +90,12 @@ CI_API_TOKEN=
 
 # CI/CD API token 的 SHA-256 hex 摘要，生产环境推荐使用
 CI_API_TOKEN_SHA256=
+
+# 分享页下载缓存（按文件 sha256 命中），默认开启
+DOWNLOAD_CACHE_ENABLED=true
+DOWNLOAD_CACHE_DIR=./data/download-cache
+DOWNLOAD_CACHE_MAX_FILE_BYTES=536870912
+DOWNLOAD_CACHE_MAX_BYTES=2147483648
 ```
 
 说明：
@@ -97,6 +103,8 @@ CI_API_TOKEN_SHA256=
 - 对象存储配置不通过 `.env` 配置，请在后台“存储配置”页面新增并验证。
 - 管理员账号不通过 `.env` 自动创建，请通过 `/setup` 页面或 `/api/setup/admin` 接口初始化。
 - 生产环境推荐使用 `CI_API_TOKEN_SHA256`，值为 CI Token 的 SHA-256 hex 摘要；本地开发可直接使用 `CI_API_TOKEN`。
+- 分享页「下载」由服务端转发并改写 `Content-Disposition`，因此保存的是原始文件名；下载内容会按 sha256 缓存在本地，同一文件只回源一次。Docker 部署时 `DOWNLOAD_CACHE_DIR` 建议指向挂载卷（如 `/app/data/download-cache`）。超过 `DOWNLOAD_CACHE_MAX_FILE_BYTES` 的文件不缓存，缓存总量超过 `DOWNLOAD_CACHE_MAX_BYTES` 时按最近使用时间淘汰。
+- 分享页「直连下载」会 302 跳到对象存储 / CDN，速度更快，但文件名以存储对象名为准。
 
 ## 数据库生成步骤
 
