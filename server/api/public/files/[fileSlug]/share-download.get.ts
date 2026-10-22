@@ -37,7 +37,11 @@ export default defineEventHandler(async (event) => {
 
     const versionDownloadUrl = await createSignedDownloadUrl(version.objectKey, version.storageConfigId)
 
-    return sendRedirect(event, versionDownloadUrl, 302)
+    return streamFileDownload(event, {
+      url: versionDownloadUrl,
+      fileName: version.fileName,
+      mimeType: version.mimeType
+    })
   }
 
   const release = await getActiveFileRelease({
@@ -68,5 +72,9 @@ export default defineEventHandler(async (event) => {
 
   const downloadUrl = await createSignedDownloadUrl(release.version.objectKey, release.version.storageConfigId)
 
-  return sendRedirect(event, downloadUrl, 302)
+  return streamFileDownload(event, {
+    url: downloadUrl,
+    fileName: release.version.fileName,
+    mimeType: release.version.mimeType
+  })
 })
